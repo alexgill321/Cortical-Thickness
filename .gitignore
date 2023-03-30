@@ -1,0 +1,9 @@
+# IDE
+.idea/
+
+# Project folders
+data/
+outputs/
+
+# Jupyter Notebook
+.ipynb_checkpoints
