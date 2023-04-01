@@ -1,7 +1,7 @@
 from tensorflow import keras
 
 
-def encoder(n_features, h_dim, z_dim):
+def create_encoder(n_features, h_dim, z_dim):
     """Creates the encoder."""
     inputs = keras.Input(shape=(n_features,))
     x = inputs
@@ -14,7 +14,7 @@ def encoder(n_features, h_dim, z_dim):
     return model
 
 
-def decoder(encoded_dim, n_features, h_dim):
+def create_decoder(encoded_dim, n_features, h_dim):
     """Creates the decoder."""
     encoded = keras.Input(shape=(encoded_dim,))
     x = encoded
@@ -27,7 +27,7 @@ def decoder(encoded_dim, n_features, h_dim):
     return model
 
 
-def discriminator(z_dim, h_dim):
+def create_discriminator(z_dim, h_dim):
     """Creates the discriminator."""
     z_features = keras.Input(shape=(z_dim,))
     x = z_features
