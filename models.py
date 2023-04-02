@@ -92,8 +92,6 @@ class AAE(keras.Model):
         self.autoencoder_loss_fn = autoencoder_loss_fn
         self.discriminator_loss_fn = discriminator_loss_fn
 
-    def call(self, inputs, training=None, mask=None):
-        pass
 
     def train_step(self, batch_data):
         batch_x, batch_y = batch_data

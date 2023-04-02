@@ -18,9 +18,12 @@ def main():
     data = generate_data(filepath)
     print(data.element_spec[0].shape[1])
     aae1 = train_aae(data, batch_size, epochs, lr, h_dim, z_dim)
-
-    # save model to /outputs
-    aae1.save('outputs/models/aae/aae1.h5')
+    save_dir = os.path.join(cur, 'outputs/models/aae/aae1')
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    aae1.encoder.save_weights(os.path.join(save_dir, 'encoder.h5'))
+    aae1.decoder.save_weights(os.path.join(save_dir, 'decoder.h5'))
+    aae1.discriminator.save_weights(os.path.join(save_dir, 'discriminator.h5'))
 
 
 if __name__ == "__main__":
