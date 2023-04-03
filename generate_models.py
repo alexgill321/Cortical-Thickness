@@ -1,10 +1,12 @@
 import tensorflow as tf
-from models import AAE, create_encoder, create_decoder, create_discriminator, \
+from models import AAE, Encoder, Decoder, Discriminator, \
     discriminator_loss, autoencoder_loss, generator_loss
+import os
 import math
 
 
-def train_aae(data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20):
+def train_aae(data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20, savefile=None):
+    data = data.batch(batch_size)
     if h_dim is None:
         h_dim = [100, 100]
     n_features = data.element_spec[0].shape[1]
@@ -13,13 +15,31 @@ def train_aae(data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20)
     aae = compile_aae(aae, lr)
     callbacks = [tf.keras.callbacks.LearningRateScheduler(lr_decay)]
     aae.fit(data, batch_size=batch_size, epochs=epochs, callbacks=callbacks)
-    return aae
+    if savefile is not None:
+        if not os.path.exists(savefile):
+            os.makedirs(savefile)
+        aae.encoder.save(os.path.join(savefile, 'encoder'))
+        aae.decoder.save(os.path.join(savefile, 'decoder'))
+        aae.discriminator.save(os.path.join(savefile, 'discriminator'))
 
 
-def create_aae(n_features,n_labels, h_dim, z_dim):
-    encoder = create_encoder(n_features, h_dim, z_dim)
-    decoder = create_decoder(z_dim + n_labels, n_features, h_dim)
-    discriminator = create_discriminator(z_dim, h_dim)
+def test_aae(data, savefile):
+    # restore encoder, decoder, discriminator from savefile
+    encoder = tf.keras.models.load_model(os.path.join(savefile, 'encoder'))
+    decoder = tf.keras.models.load_model(os.path.join(savefile, 'decoder'))
+    discriminator = tf.keras.models.load_model(os.path.join(savefile, 'discriminator'))
+    z_dim = encoder.layers[1].output_shape[1]
+    # create aae instance
+    aae = AAE(encoder, decoder, discriminator, z_dim)
+    # run test data through aae, saving resulting loss values for each sample
+    output = aae(data)
+    return
+
+
+def create_aae(n_features, n_labels, h_dim, z_dim):
+    encoder = Encoder(n_features, h_dim, z_dim)
+    decoder = Decoder(z_dim + n_labels, n_features, h_dim)
+    discriminator = Discriminator(z_dim, h_dim)
     aae = AAE(encoder, decoder, discriminator, z_dim)
     return aae
 
