@@ -39,4 +39,15 @@ def generate_data(filepath):
     test = tf.data.Dataset.from_tensor_slices((test_x_norm, test_y))
     return train, test
 
+
+def generate_data_validation(filepath, validation_split=0.2):
+    """
+    Generate data to be used in model training
+
+    splits the data from the csv file into training test and validation sets
+    """
+    train, test = generate_data(filepath)
+    train, validation = tf.keras.utils.split_data(train, validation_split)
+
+    return train, validation, test
 #%%

@@ -136,15 +136,6 @@ def discriminator_loss(real_output, fake_output):
     return loss_fake + loss_real
 
 
-def autoencoder_loss(x, output):
-    return tf.keras.losses.MeanSquaredError()(x, output)
-
-
-def generator_loss(fake_output):
-    cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
-    return cross_entropy(tf.ones_like(fake_output), fake_output)
-
-
 # noinspection PyMethodOverriding
 class AAE(keras.Model):
     def __init__(
@@ -152,7 +143,7 @@ class AAE(keras.Model):
             encoder,
             decoder,
             discriminator,
-            z_dim
+            z_dim,
     ):
         super(AAE, self).__init__()
         self.encoder = encoder
@@ -160,16 +151,22 @@ class AAE(keras.Model):
         self.discriminator = discriminator
         self.z_dim = z_dim
         self.accuracy = tf.keras.metrics.BinaryAccuracy()
+        self.autoencoder_loss_fn = None
+        self.discriminator_loss_fn = None
+        self.generator_loss_fn = None
+        self.autoencoder_optimizer = None
+        self.discriminator_optimizer = None
+        self.generator_optimizer = None
 
     def compile(
-            self,
-            encoder_optimizer,
-            generator_optimizer,
-            discriminator_optimizer,
-            generator_loss_fn,
-            autoencoder_loss_fn,
-            discriminator_loss_fn,
-            **kwargs
+        self,
+        encoder_optimizer=tf.keras.optimizers.Adam(),
+        generator_optimizer=tf.keras.optimizers.Adam(),
+        discriminator_optimizer=tf.keras.optimizers.Adam(),
+        generator_loss_fn=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+        autoencoder_loss_fn=tf.keras.losses.MeanSquaredError(),
+        discriminator_loss_fn=discriminator_loss,
+        **kwargs
     ):
         super(AAE, self).compile(**kwargs)
         self.autoencoder_optimizer = encoder_optimizer
@@ -211,7 +208,7 @@ class AAE(keras.Model):
             dc_fake = self.discriminator(encoder_output, training=True)
 
             # Generator loss
-            gen_loss = self.generator_loss_fn(dc_fake)
+            gen_loss = self.generator_loss_fn(tf.ones_like(dc_fake), dc_fake)
 
         ae_grads = ae_tape.gradient(ae_loss, self.encoder.trainable_variables + self.decoder.trainable_variables)
         self.autoencoder_optimizer.apply_gradients(
@@ -232,12 +229,18 @@ class AAE(keras.Model):
             "gen_loss": gen_loss
         }
 
-    def call(self, inputs):
-        x, y = inputs
-        x_expanded = tf.expand_dims(x, axis=0)
-        y_expanded = tf.expand_dims(y, axis=0)
-        encoder_output = self.encoder(x_expanded, training=False)
-        decoder_output = self.decoder(tf.concat([encoder_output, y_expanded], axis=1), training=False)
+    def eval(self, data):
+        data = data.batch(len(data))
+        batch = next(iter(data))
+        output = self(batch)
+        x, _ = batch
+        results = tf.keras.metrics.MSE(x, output)
+        return results
+
+    def call(self, data):
+        x, y = data
+        encoder_output = self.encoder(x, training=False)
+        decoder_output = self.decoder(tf.concat([encoder_output, y], axis=1), training=False)
         return decoder_output
 
     def get_config(self):

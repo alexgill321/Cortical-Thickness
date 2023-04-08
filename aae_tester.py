@@ -21,7 +21,8 @@ def main():
     # Train AAE
     save_dir = os.path.join(cur, 'outputs/models/aae/aae1/')
     train_aae(train_data, batch_size, epochs, lr, h_dim, z_dim, save_dir)
-    test_aae(test_data, save_dir)
+    results = test_aae(test_data, save_dir)
+    print(results)
 
 
 if __name__ == "__main__":

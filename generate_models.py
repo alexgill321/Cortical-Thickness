@@ -1,6 +1,6 @@
 import tensorflow as tf
 from models import AAE, Encoder, Decoder, Discriminator, \
-    discriminator_loss, autoencoder_loss, generator_loss
+    discriminator_loss
 import os
 import math
 
@@ -12,7 +12,7 @@ def train_aae(data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20,
     n_features = data.element_spec[0].shape[1]
     n_labels = data.element_spec[1].shape[1]
     aae = create_aae(n_features, n_labels, h_dim, z_dim)
-    aae = compile_aae(aae, lr)
+    aae.compile()
     callbacks = [tf.keras.callbacks.LearningRateScheduler(lr_decay)]
     aae.fit(data, batch_size=batch_size, epochs=epochs, callbacks=callbacks)
     if savefile is not None:
@@ -31,10 +31,9 @@ def test_aae(data, savefile):
     z_dim = encoder.layers[1].output_shape[1]
     # create aae instance
     aae = AAE(encoder, decoder, discriminator, z_dim)
+    aae.compile()
     # run test data through aae, saving resulting loss values for each sample
-    output = []
-    for point in data:
-        output.append(aae(point))
+    output = aae.eval(data)
     return output
 
 
@@ -47,11 +46,15 @@ def create_aae(n_features, n_labels, h_dim, z_dim):
 
 
 def compile_aae(aae, base_lr):
-    ae_optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr)
-    dc_optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr)
-    gen_optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr)
-    aae.compile(ae_optimizer, dc_optimizer, gen_optimizer,
-                generator_loss, autoencoder_loss, discriminator_loss)
+    encoder_lr_schedule = lr_decay(initial_lr, decay_steps, decay_rate)
+    generator_lr_schedule = lr_decay(initial_lr, decay_steps, decay_rate)
+    discriminator_lr_schedule = lr_decay(initial_lr, decay_steps, decay_rate)
+
+    encoder_optimizer = tf.keras.optimizers.Adam(learning_rate=encoder_lr_schedule)
+    generator_optimizer = tf.keras.optimizers.Adam(learning_rate=generator_lr_schedule)
+    discriminator_optimizer = tf.keras.optimizers.Adam(learning_rate=discriminator_lr_schedule)
+
+    aae.compile(encoder_optimizer, generator_optimizer, discriminator_optimizer, discriminator_loss=discriminator_loss)
     return aae
 
 
