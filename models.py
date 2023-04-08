@@ -234,8 +234,10 @@ class AAE(keras.Model):
 
     def call(self, inputs):
         x, y = inputs
-        encoder_output = self.encoder(x, training=False)
-        decoder_output = self.decoder(tf.concat([encoder_output, y], axis=1), training=False)
+        x_expanded = tf.expand_dims(x, axis=0)
+        y_expanded = tf.expand_dims(y, axis=0)
+        encoder_output = self.encoder(x_expanded, training=False)
+        decoder_output = self.decoder(tf.concat([encoder_output, y_expanded], axis=1), training=False)
         return decoder_output
 
     def get_config(self):

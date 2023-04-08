@@ -13,20 +13,30 @@ def generate_data(filepath):
      and splits into sets based on the value in dcode
     """
     db = pd.read_csv(filepath)
-    label = db.loc[['dcode']]
     enc_sex = OneHotEncoder(sparse=False)
     enc_age = OneHotEncoder(sparse=False)
     scaler = RobustScaler()
     one_hot_sex = enc_sex.fit_transform(db['sex'].values.reshape(-1, 1))
     age = db[['age']].round(0)
     one_hot_age = enc_age.fit_transform(age['age'].values.reshape(-1, 1))
-    x_data = db.drop(['age', 'sex', 'scanner', 'euler', 'BrainSegVolNotVent', 'euler_med', 'sample', 'dcode',
-                      'timepoint'], axis=1, inplace=False)
-    y_data = np.concatenate((one_hot_age, one_hot_sex), axis=1).astype('float32')
-    x_data_norm = scaler.fit_transform(x_data)
-    train_x = x_data[label['dcode'] == 0]
-    test_x = x_data[label['dcode'] == 1]
 
-    return train_x, test_x
+    # Get the indices matching a condition on a feature
+    condition_indices = db[db['dcode'] == 0].index
+    db = db.drop(['age', 'sex', 'scanner', 'euler', 'BrainSegVolNotVent', 'euler_med', 'sample', 'dcode',
+                  'timepoint'], axis=1, inplace=False)
+
+    # Create two new datasets based on the condition indices
+    train_x = db.loc[condition_indices]
+    test_x = db.loc[~db.index.isin(condition_indices)]
+
+    y_data = np.concatenate((one_hot_age, one_hot_sex), axis=1).astype('float32')
+    train_x_norm = scaler.fit_transform(train_x)
+    test_x_norm = scaler.fit_transform(test_x)
+    train_y = y_data[condition_indices, :]
+    test_y = y_data[~db.index.isin(condition_indices), :]
+
+    train = tf.data.Dataset.from_tensor_slices((train_x_norm, train_y))
+    test = tf.data.Dataset.from_tensor_slices((test_x_norm, test_y))
+    return train, test
 
 #%%

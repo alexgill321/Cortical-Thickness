@@ -18,9 +18,9 @@ def train_aae(data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20,
     if savefile is not None:
         if not os.path.exists(savefile):
             os.makedirs(savefile)
-        aae.encoder.save(os.path.join(savefile, 'encoder'))
-        aae.decoder.save(os.path.join(savefile, 'decoder'))
-        aae.discriminator.save(os.path.join(savefile, 'discriminator'))
+        aae.encoder.save(os.path.join(savefile, 'encoder'), save_format="tf")
+        aae.decoder.save(os.path.join(savefile, 'decoder'), save_format="tf")
+        aae.discriminator.save(os.path.join(savefile, 'discriminator'), save_format="tf")
 
 
 def test_aae(data, savefile):
@@ -32,8 +32,10 @@ def test_aae(data, savefile):
     # create aae instance
     aae = AAE(encoder, decoder, discriminator, z_dim)
     # run test data through aae, saving resulting loss values for each sample
-    output = aae(data)
-    return
+    output = []
+    for point in data:
+        output.append(aae(point))
+    return output
 
 
 def create_aae(n_features, n_labels, h_dim, z_dim):
