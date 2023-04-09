@@ -226,7 +226,10 @@ class AAE(keras.Model):
             "ae_loss": ae_loss,
             "dc_loss": dc_loss,
             "dc_acc": dc_acc,
-            "gen_loss": gen_loss
+            "gen_loss": gen_loss,
+            "disc_lr": self.discriminator_optimizer.lr,
+            "gen_lr": self.generator_optimizer.lr,
+            "ae_lr": self.autoencoder_optimizer.lr
         }
 
     def eval(self, data):

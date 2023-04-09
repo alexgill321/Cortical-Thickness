@@ -1,4 +1,3 @@
-import os
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder, RobustScaler
@@ -13,8 +12,8 @@ def generate_data(filepath):
      and splits into sets based on the value in dcode
     """
     db = pd.read_csv(filepath)
-    enc_sex = OneHotEncoder(sparse=False)
-    enc_age = OneHotEncoder(sparse=False)
+    enc_sex = OneHotEncoder(sparse_output=False)
+    enc_age = OneHotEncoder(sparse_output=False)
     scaler = RobustScaler()
     one_hot_sex = enc_sex.fit_transform(db['sex'].values.reshape(-1, 1))
     age = db[['age']].round(0)
