@@ -1,13 +1,32 @@
 import tensorflow as tf
 import numpy as np
-from models import AAE, Encoder, Decoder, Discriminator, \
+from models.aae_models import AAE, AAEEncoder, AAEDecoder, AAEDiscriminator, \
     discriminator_loss
 import os
 import math
 
 
 def train_aae(data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20, savefile=None):
-    """ Create, Compile, and Train AAE model
+    """Create, train and save an AAE model.
+
+    Args:
+        data (tf.data.Dataset):
+         Dataset to train the model on.
+        batch_size (int, optional):
+         Batch size to use for training.
+        epochs (int, optional):
+         Number of epochs to train for.
+        lr (float, optional):
+         Learning rate to use for training.
+        h_dim (list, optional):
+         List of hidden layer dimensions.
+        z_dim (int, optional):
+         Dimension of latent space.
+        savefile (str, optional):
+         Path to save the model to.
+
+    Returns:
+        None
     """
     if h_dim is None:
         h_dim = [100, 100]
@@ -51,28 +70,43 @@ def train_aae(data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20,
 
 
 def test_aae(data, savefile):
+    """Evaluate an AAE model over a dataset.
+
+    Args:
+        data (tf.data.Dataset):
+            Dataset to evaluate the model on.
+        savefile (str):
+            Path to the model to evaluate.
+
+    Returns:
+        Output of the model on the dataset. Stored as a list of loss values for each sample.
+    """
+
     # restore encoder, decoder, discriminator from savefile
     encoder = tf.keras.models.load_model(os.path.join(savefile, 'encoder'))
     decoder = tf.keras.models.load_model(os.path.join(savefile, 'decoder'))
     discriminator = tf.keras.models.load_model(os.path.join(savefile, 'discriminator'))
     z_dim = encoder.layers[1].output_shape[1]
+
     # create aae instance
     aae = AAE(encoder, decoder, discriminator, z_dim)
     aae.compile()
+
     # run test data through aae, saving resulting loss values for each sample
     output = aae.eval(data)
     return output
 
 
 def create_aae(n_features, n_labels, h_dim, z_dim):
-    encoder = Encoder(n_features, h_dim, z_dim)
-    decoder = Decoder(z_dim + n_labels, n_features, h_dim)
-    discriminator = Discriminator(z_dim, h_dim)
+    encoder = AAEEncoder(n_features, h_dim, z_dim)
+    decoder = AAEDecoder(z_dim + n_labels, n_features, h_dim)
+    discriminator = AAEDiscriminator(z_dim, h_dim)
     aae = AAE(encoder, decoder, discriminator, z_dim)
     return aae
 
 
 class MultiOptimizerLearningRateScheduler(tf.keras.callbacks.LearningRateScheduler):
+    """Learning rate scheduler that can be used with multiple optimizers."""
     def __init__(self, lr_schedules, **kwargs):
         super(MultiOptimizerLearningRateScheduler, self).__init__(lr_schedules[0], **kwargs)
         self.lr_schedules = lr_schedules
@@ -85,6 +119,11 @@ class MultiOptimizerLearningRateScheduler(tf.keras.callbacks.LearningRateSchedul
 
 
 class CyclicLR:
+    """Scheduler that implements a cyclical learning rate policy (CLR).
+
+     Cycles the learning rate between two boundaries with some constant frequency,
+     as detailed in the paper `Cyclical Learning Rates for Training Neural Networks`_.
+     """
     def __init__(self, base_lr, step_size, max_lr=.005, mode="triangular"):
         self.base_lr = base_lr
         self.max_lr = max_lr

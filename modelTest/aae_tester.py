@@ -1,5 +1,5 @@
 from utils import generate_data
-from generate_models import train_aae, test_aae
+from modelUtils.aae_utils import train_aae, test_aae
 import os
 
 
@@ -15,11 +15,11 @@ def main():
     # -------------------------------------------------------------------------
     # Generate data
     cur = os.getcwd()
-    filepath = os.path.join(cur, 'outputs/megasample_cleaned.csv')
+    filepath = os.path.join(cur, '../outputs/megasample_cleaned.csv')
     train_data, test_data = generate_data(filepath)
 
     # Train AAE
-    save_dir = os.path.join(cur, 'outputs/models/aae/aae1/')
+    save_dir = os.path.join(cur, '../outputs/models/aae/aae1/')
     train_aae(train_data, batch_size, epochs, lr, h_dim, z_dim, save_dir)
     results = test_aae(test_data, save_dir)
     print(results)

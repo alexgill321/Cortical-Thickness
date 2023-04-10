@@ -2,10 +2,9 @@ import tensorflow as tf
 from tensorflow import keras
 
 
-# noinspection PyMethodOverriding
-class Encoder(tf.keras.Model):
+class AAEEncoder(tf.keras.Model):
     def __init__(self, input_dim, hidden_dim, latent_dim):
-        super(Encoder, self).__init__()
+        super(AAEEncoder, self).__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
@@ -30,7 +29,7 @@ class Encoder(tf.keras.Model):
         # Create a Keras model for the encoder
         return keras.Model(inputs=inputs, outputs=latent, name='encoder')
 
-    def call(self, inputs):
+    def call(self, inputs, training=False, mask=None):
         return self.model(inputs)
 
     def get_config(self):
@@ -41,14 +40,13 @@ class Encoder(tf.keras.Model):
         }
 
     @classmethod
-    def from_config(cls, config):
+    def from_config(cls, config, custom_objects=None):
         return cls(config["input_dim"], config["hidden_dim"], config["latent_dim"])
 
 
-# noinspection PyMethodOverriding
-class Decoder(tf.keras.Model):
+class AAEDecoder(tf.keras.Model):
     def __init__(self, latent_dim, input_dim, hidden_dim):
-        super(Decoder, self).__init__()
+        super(AAEDecoder, self).__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
@@ -73,7 +71,7 @@ class Decoder(tf.keras.Model):
         # Create a Keras model for the decoder
         return keras.Model(inputs=inputs, outputs=output, name='decoder')
 
-    def call(self, inputs):
+    def call(self, inputs, training=False, mask=None):
         return self.model(inputs)
 
     def get_config(self):
@@ -84,14 +82,13 @@ class Decoder(tf.keras.Model):
         }
 
     @classmethod
-    def from_config(cls, config):
+    def from_config(cls, config, custom_objects=None):
         return cls(config["input_dim"], config["hidden_dim"], config["latent_dim"])
 
 
-# noinspection PyMethodOverriding
-class Discriminator(tf.keras.Model):
+class AAEDiscriminator(tf.keras.Model):
     def __init__(self, latent_dim, hidden_dim):
-        super(Discriminator, self).__init__()
+        super(AAEDiscriminator, self).__init__()
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
 
@@ -115,7 +112,7 @@ class Discriminator(tf.keras.Model):
         # Create a Keras model for the discriminator
         return keras.Model(inputs=inputs, outputs=output, name='discriminator')
 
-    def call(self, inputs):
+    def call(self, inputs, training=False, mask=None):
         return self.model(inputs)
 
     def get_config(self):
@@ -125,7 +122,7 @@ class Discriminator(tf.keras.Model):
         }
 
     @classmethod
-    def from_config(cls, config):
+    def from_config(cls, config, custom_objects=None):
         return cls(config["hidden_dim"], config["latent_dim"])
 
 
@@ -136,7 +133,6 @@ def discriminator_loss(real_output, fake_output):
     return loss_fake + loss_real
 
 
-# noinspection PyMethodOverriding
 class AAE(keras.Model):
     def __init__(
             self,
@@ -240,7 +236,7 @@ class AAE(keras.Model):
         results = tf.keras.metrics.MSE(x, output)
         return results
 
-    def call(self, data):
+    def call(self, data, training=False, mask=None):
         x, y = data
         encoder_output = self.encoder(x, training=False)
         decoder_output = self.decoder(tf.concat([encoder_output, y], axis=1), training=False)
@@ -255,10 +251,14 @@ class AAE(keras.Model):
         }
 
     @classmethod
-    def from_config(cls, config):
-        encoder = Encoder.from_config(config["encoder_config"])
-        decoder = Decoder.from_config(config["decoder_config"])
-        discriminator = Discriminator.from_config(config["discriminator_config"])
+    def from_config(cls, config, custom_objects=None):
+        encoder = AAEEncoder.from_config(config["encoder_config"], custom_objects=custom_objects)
+        decoder = AAEDecoder.from_config(config["decoder_config"], custom_objects=custom_objects)
+        discriminator = AAEDiscriminator.from_config(config["discriminator_config"], custom_objects=custom_objects)
         z_dim = config["z_dim"]
         return cls(encoder, decoder, discriminator, z_dim)
-# %%
+
+
+
+
+
