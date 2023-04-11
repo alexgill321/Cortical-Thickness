@@ -28,8 +28,8 @@ class VAEEncoder(keras.Model):
             ))
         self.y_layer = keras.layers.Dense(
             self.y_dim,
-            activation='softmax',
-            kernel_initializer='lecun_normal',
+            activation='sigmoid',
+            kernel_initializer='random_uniform',
             bias_initializer='zeros')
         self.latent_layer = keras.layers.Dense(
             self.latent_dim * 2,
