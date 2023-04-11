@@ -40,7 +40,7 @@ def train_vae(data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20,
     n_labels = data.element_spec[1].shape[1]
 
     # Create vae model
-    vae = create_vae(n_features, n_labels, h_dim, z_dim, l2_reg=l2_reg)
+    vae = create_vae(n_features, h_dim, z_dim, n_labels, l2_reg=l2_reg)
 
     # Create optimizer
     vae_optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
@@ -75,7 +75,6 @@ def test_vae(data, savefile):
     # restore encoder, decoder from savefile
     encoder = tf.keras.models.load_model(os.path.join(savefile, 'encoder'))
     decoder = tf.keras.models.load_model(os.path.join(savefile, 'decoder'))
-    z_dim = encoder.layers[1].output_shape[1]
 
     # create vae instance
     vae = VAE(encoder, decoder)
@@ -86,8 +85,8 @@ def test_vae(data, savefile):
     return output
 
 
-def create_vae(n_features, n_labels, h_dim, z_dim, l2_reg=1e-3):
-    encoder = VAEEncoder(n_features, h_dim, z_dim, n_labels, l2_reg=l2_reg)
-    decoder = VAEDecoder(z_dim + n_labels, h_dim, n_features, l2_reg=l2_reg)
+def create_vae(n_features, h_dim, z_dim, n_labels, l2_reg=1e-3):
+    encoder = VAEEncoder(h_dim, z_dim,n_labels, l2_reg=l2_reg)
+    decoder = VAEDecoder(h_dim, n_features, l2_reg=l2_reg)
     vae = VAE(encoder, decoder)
     return vae

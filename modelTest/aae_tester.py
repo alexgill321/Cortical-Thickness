@@ -1,5 +1,7 @@
 from utils import generate_data
 from modelUtils.aae_utils import train_aae, test_aae
+from sklearn.preprocessing import RobustScaler
+
 import os
 
 
@@ -16,7 +18,7 @@ def main():
     # Generate data
     cur = os.getcwd()
     filepath = os.path.join(cur, '../outputs/megasample_cleaned.csv')
-    train_data, test_data = generate_data(filepath)
+    train_data, test_data = generate_data(filepath, RobustScaler())
 
     # Train AAE
     save_dir = os.path.join(cur, '../outputs/models/aae/aae1/')

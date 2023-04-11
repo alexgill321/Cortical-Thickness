@@ -7,11 +7,11 @@ def main():
     """ Generate and train VAE models with desired parameters
     """
     # -------------------------------------------------------------------------
-    h_dim = [100, 100]
+    h_dim = [100]
     z_dim = 20
     batch_size = 64
     epochs = 2000
-    lr = 0.0001
+    lr = 0.001
     l2_reg = 0.001
     # -------------------------------------------------------------------------
     # Generate data

@@ -1,10 +1,10 @@
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import OneHotEncoder, RobustScaler
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 import tensorflow as tf
 
 
-def generate_data(filepath):
+def generate_data(filepath, scaler=StandardScaler()):
     """
     Generate data to be used in model training
 
@@ -14,7 +14,6 @@ def generate_data(filepath):
     db = pd.read_csv(filepath)
     enc_sex = OneHotEncoder(sparse_output=False)
     enc_age = OneHotEncoder(sparse_output=False)
-    scaler = RobustScaler()
     one_hot_sex = enc_sex.fit_transform(db['sex'].values.reshape(-1, 1))
     age = db[['age']].round(0)
     one_hot_age = enc_age.fit_transform(age['age'].values.reshape(-1, 1))
@@ -30,7 +29,7 @@ def generate_data(filepath):
 
     y_data = np.concatenate((one_hot_age, one_hot_sex), axis=1).astype('float32')
     train_x_norm = scaler.fit_transform(train_x)
-    test_x_norm = scaler.fit_transform(test_x)
+    test_x_norm = scaler.transform(test_x)
     train_y = y_data[condition_indices, :]
     test_y = y_data[~db.index.isin(condition_indices), :]
 
@@ -39,13 +38,13 @@ def generate_data(filepath):
     return train, test
 
 
-def generate_data_validation(filepath, validation_split=0.2):
+def generate_data_validation(filepath, scaler=StandardScaler(), validation_split=0.2):
     """
     Generate data to be used in model training
 
     splits the data from the csv file into training test and validation sets
     """
-    train, test = generate_data(filepath)
+    train, test = generate_data(filepath, scaler)
     train, validation = tf.keras.utils.split_data(train, validation_split)
 
     return train, validation, test

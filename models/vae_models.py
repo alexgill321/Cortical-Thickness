@@ -1,10 +1,6 @@
 import tensorflow as tf
 from tensorflow import keras
-
-
-def reparameterize(mean, log_var):
-    eps = tf.random.normal(shape=mean.shape)
-    return eps * tf.exp(log_var * 0.5) + mean
+import sys
 
 
 class VAEEncoder(keras.Model):
@@ -15,43 +11,51 @@ class VAEEncoder(keras.Model):
     regularized by a l2 penalty. The final layer is a dense layer with a linear activation function. Additionally,
     the output of the hidden layers is used to predict the class of the input data.
     """
-    def __init__(self, input_dim, hidden_dim, latent_dim, y_dim, l2_reg=1e-3):
+    def __init__(self, hidden_dim, latent_dim, y_dim, l2_reg=1e-3):
         super(VAEEncoder, self).__init__()
-        self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
         self.y_dim = y_dim
         self.l2_reg = l2_reg
-        self.input_layer = keras.Input(shape=(self.input_dim,))
         self.hidden_layers = []
-        self.y_layer = keras.layers.Dense(
-            y_dim,
-            activation='softmax')
-        self.latent_layer = keras.layers.Dense(
-            self.latent_dim * 2,
-            activation=None,
-            kernel_regularizer=keras.regularizers.l2(l2_reg))
-        for i in range(len(self.hidden_dim)):
+        for h_dim in self.hidden_dim:
             self.hidden_layers.append(keras.layers.Dense(
-                self.hidden_dim[i],
+                h_dim,
                 activation='selu',
                 kernel_initializer='lecun_normal',
+                bias_initializer='zeros',
                 kernel_regularizer=keras.regularizers.l2(l2_reg)
             ))
+        self.y_layer = keras.layers.Dense(
+            self.y_dim,
+            activation='softmax',
+            kernel_initializer='lecun_normal',
+            bias_initializer='zeros')
+        self.latent_layer = keras.layers.Dense(
+            self.latent_dim * 2,
+            activation='selu',
+            kernel_initializer='lecun_normal',
+            bias_initializer='zeros',
+            kernel_regularizer=keras.regularizers.l2(l2_reg))
 
     def call(self, inputs, training=False, mask=None):
-        x = self.input_layer(inputs)
+        x = inputs
         for layer in self.hidden_layers:
             x = layer(x)
         z = self.latent_layer(x)
+        # Get latent distribution parameters from latent representation
         z_mean, z_log_var = tf.split(z, num_or_size_splits=2, axis=1)
-        z = reparameterize(z_mean, z_log_var)
+
+        # Sample from latent distribution
+        batch = tf.shape(z_mean)[0]
+        dim = tf.shape(z_mean)[1]
+        epsilon = tf.keras.backend.random_normal(shape=(batch, dim))
+        z = z_mean + tf.exp(0.5 * z_log_var) * epsilon
         y = self.y_layer(x)
         return z_mean, z_log_var, z, y
 
     def get_config(self):
         return {
-            "input_dim": self.input_dim,
             "hidden_dim": self.hidden_dim,
             "latent_dim": self.latent_dim,
             "y_dim": self.y_dim,
@@ -71,25 +75,25 @@ class VAEDecoder(keras.Model):
     The final layer is a dense layer with a linear activation function, and is initialized with a glorot uniform
     initializer.
     """
-    def __init__(self, input_dim, hidden_dim, output_dim, l2_reg=1e-3):
+    def __init__(self, hidden_dim, output_dim, l2_reg=1e-3):
         super(VAEDecoder, self).__init__()
         self.hidden_dim = hidden_dim
-        self.input_dim = input_dim
         self.output_dim = output_dim
         self.l2_reg = l2_reg
-        self.input_layer = keras.Input(shape=(input_dim,))
         self.dense_layers = []
-        for i in range(len(self.hidden_dim)):
+        for h_dim in self.hidden_dim:
             self.dense_layers.append(keras.layers.Dense(
-                self.hidden_dim[i],
+                h_dim,
                 activation='selu',
                 kernel_initializer='lecun_normal',
+                bias_initializer='zeros',
                 kernel_regularizer=tf.keras.regularizers.l2(l2_reg)
             ))
         self.dense_layers.append(tf.keras.layers.Dense(
             self.output_dim,
-            activation='linear',
-            kernel_initializer='glorot_uniform'
+            activation='softmax',
+            kernel_initializer='glorot_uniform',
+            bias_initializer='zeros'
         ))
 
     def call(self, inputs, training=False, mask=None):
@@ -101,14 +105,19 @@ class VAEDecoder(keras.Model):
     def get_config(self):
         return {
             "hidden_dim": self.hidden_dim,
-            "input_dim": self.input_dim,
             "output_dim": self.output_dim,
             "l2_reg": self.l2_reg
         }
 
     @classmethod
     def from_config(cls, config, custom_objects=None):
-        return cls(config["hidden_dim"], config["input_dim"], config["output_dim"], config["l2_reg"])
+        return cls(config["hidden_dim"], config["output_dim"], config["l2_reg"])
+
+
+def calc_kl_loss(mu, log_var):
+    loss = -0.5 * (1 + log_var - tf.square(mu) - tf.exp(log_var))
+    loss = tf.reduce_mean(tf.reduce_sum(loss, axis=1))
+    return loss
 
 
 class VAE(keras.Model):
@@ -130,10 +139,9 @@ class VAE(keras.Model):
 
     def compile(
             self,
-            optimizer=tf.keras.optimizers.Adam(lr=1e-3),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
             reconstruction_loss_fn=tf.keras.losses.MeanSquaredError(),
-            kl_loss_fn=lambda x, mu, log_var: -0.5 * tf.reduce_sum(1 + log_var - tf.square(mu) - tf.exp(log_var),
-                                                                   axis=1),
+            kl_loss_fn=calc_kl_loss,
             y_loss_fn=tf.keras.losses.CategoricalCrossentropy(),
             **kwargs
     ):
@@ -141,21 +149,20 @@ class VAE(keras.Model):
         self.optimizer = optimizer
         self.reconstruction_loss_fn = reconstruction_loss_fn
         self.kl_loss_fn = kl_loss_fn
+        self.y_loss_fn = y_loss_fn
 
     def train_step(self, batch_data):
         x, y = batch_data
         with tf.GradientTape() as tape:
             z_mean, z_log_var, z, y_hat, x_reconstructed = self(batch_data, training=True)
-
             reconstruction_loss = self.reconstruction_loss_fn(x, x_reconstructed)
-            kl_loss = tf.reduce_mean(self.kl_loss_fn(z, z_mean, z_log_var))
+            kl_loss = tf.reduce_mean(self.kl_loss_fn(z_mean, z_log_var))
             y_loss = self.y_loss_fn(y, y_hat)
 
             total_loss = reconstruction_loss + kl_loss + y_loss
+        grads = tape.gradient(total_loss, self.trainable_weights)
 
-        grads = tape.gradient(total_loss, self.encoder.trainable_variables + self.decoder.trainable_variables)
-        self.optimizer.apply_gradients(zip(grads, self.encoder.trainable_variables + self.decoder.trainable_variables))
-
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         return {
             "reconstruction_loss": reconstruction_loss,
             "kl_loss": kl_loss,
@@ -190,3 +197,6 @@ class VAE(keras.Model):
         encoder = VAEEncoder.from_config(config["encoder_config"], custom_objects=custom_objects)
         decoder = VAEDecoder.from_config(config["decoder_config"], custom_objects=custom_objects)
         return cls(encoder, decoder)
+
+
+#%%
