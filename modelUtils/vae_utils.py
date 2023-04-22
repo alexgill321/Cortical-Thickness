@@ -1,13 +1,11 @@
 import tensorflow as tf
-import numpy as np
 from models.vae_models import VAE, VAEEncoder, VAEDecoder
 import os
-import math
 
 # TODO: Add exponential decaying learning rate callback
 
 
-def train_vae(data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20, l2_reg=0.001, savefile=None):
+def train_vae(data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20, savefile=None):
     """Create, train, and save a VAE model
 
     Args:
@@ -23,13 +21,8 @@ def train_vae(data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20,
          List of hidden layer dimensions.
         z_dim (int, optional):
          Dimension of latent space.
-        l2_reg (float, optional):
-         L2 regularization parameter used to regularize layers in the encoder and decoder.
         savefile (str, optional):
          Path to save the model to.
-
-    Returns:
-        None
     """
     if h_dim is None:
         h_dim = [100, 100]
@@ -40,7 +33,7 @@ def train_vae(data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20,
     n_labels = data.element_spec[1].shape[1]
 
     # Create vae model
-    vae = create_vae(n_features, h_dim, z_dim, n_labels, l2_reg=l2_reg)
+    vae = create_vae(n_features, h_dim, z_dim, n_labels)
 
     # Create optimizer
     vae_optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
@@ -85,8 +78,8 @@ def test_vae(data, savefile):
     return output
 
 
-def create_vae(n_features, h_dim, z_dim, n_labels, l2_reg=1e-3):
-    encoder = VAEEncoder(h_dim, z_dim,n_labels, l2_reg=l2_reg)
-    decoder = VAEDecoder(h_dim, n_features, l2_reg=l2_reg)
+def create_vae(n_features, h_dim, z_dim, n_labels):
+    encoder = VAEEncoder(h_dim, z_dim)
+    decoder = VAEDecoder(h_dim, n_features)
     vae = VAE(encoder, decoder)
     return vae

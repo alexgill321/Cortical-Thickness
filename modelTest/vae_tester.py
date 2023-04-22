@@ -1,6 +1,7 @@
-from utils import generate_data
+from utils import data_validation
 from modelUtils.vae_utils import train_vae, test_vae
 import os
+import numpy as np
 
 
 def main():
@@ -10,23 +11,20 @@ def main():
     h_dim = [100]
     z_dim = 20
     batch_size = 64
-    epochs = 2000
+    epochs = 400
     lr = 0.001
-    l2_reg = 0.001
     # -------------------------------------------------------------------------
     # Generate data
     cur = os.getcwd()
     filepath = os.path.join(cur, '../outputs/megasample_cleaned.csv')
 
-    # TODO: Ensure that data is being regularized correctly
-    # TODO: Add noise as in paper to training data
-    train_data, test_data = generate_data(filepath)
+    train_data, val_data, test_data = data_validation(filepath)
 
     # Train VAE
     save_dir = os.path.join(cur, '../outputs/models/vae/vae1/')
-    train_vae(train_data, batch_size, epochs, lr, h_dim, z_dim, l2_reg, save_dir)
+    train_vae(train_data, batch_size, epochs, lr, h_dim, z_dim, save_dir)
     results = test_vae(test_data, save_dir)
-    print(results)
+    print(np.mean(results))
 
 
 if __name__ == "__main__":

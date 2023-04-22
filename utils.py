@@ -1,10 +1,11 @@
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.model_selection import train_test_split
 import tensorflow as tf
 
 
-def generate_data(filepath, scaler=StandardScaler()):
+def generate_data(filepath, scaler=StandardScaler(), validation_split=None):
     """
     Generate data to be used in model training
 
@@ -33,19 +34,31 @@ def generate_data(filepath, scaler=StandardScaler()):
     train_y = y_data[condition_indices, :]
     test_y = y_data[~db.index.isin(condition_indices), :]
 
-    train = tf.data.Dataset.from_tensor_slices((train_x_norm, train_y))
-    test = tf.data.Dataset.from_tensor_slices((test_x_norm, test_y))
-    return train, test
+    return train_x_norm, train_y, test_x_norm, test_y
 
 
-def generate_data_validation(filepath, scaler=StandardScaler(), validation_split=0.2):
+def data_train_test(filepath, scaler=StandardScaler()):
     """
     Generate data to be used in model training
 
     splits the data from the csv file into training test and validation sets
     """
-    train, test = generate_data(filepath, scaler)
-    train, validation = tf.keras.utils.split_data(train, validation_split)
+    train_x, train_y, test_x, test_y = generate_data(filepath, scaler)
+    train = tf.data.Dataset.from_tensor_slices((train_x, train_y))
+    test = tf.data.Dataset.from_tensor_slices((test_x, test_y))
+    return train, test
 
-    return train, validation, test
+
+def data_validation(filepath, scaler=StandardScaler(), validation_split=0.2):
+    """
+    Generate data to be used in model training
+
+    splits the data from the csv file into training test and validation sets
+    """
+    train_x, train_y, test_x, test_y = generate_data(filepath, scaler)
+    train_x, val_x, train_y, val_y = train_test_split(train_x, train_y, test_size=validation_split)
+    train = tf.data.Dataset.from_tensor_slices((train_x, train_y))
+    test = tf.data.Dataset.from_tensor_slices((test_x, test_y))
+    val = tf.data.Dataset.from_tensor_slices((val_x, val_y))
+    return train, val, test
 #%%
