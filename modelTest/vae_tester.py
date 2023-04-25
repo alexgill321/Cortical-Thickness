@@ -1,5 +1,5 @@
 from utils import data_validation
-from modelUtils.vae_utils import train_vae, test_vae
+from modelUtils.vae_utils import train_val_vae, test_vae_from_file, train_vae
 import os
 import numpy as np
 
@@ -11,7 +11,7 @@ def main():
     h_dim = [100]
     z_dim = 20
     batch_size = 64
-    epochs = 400
+    epochs = 100
     lr = 0.001
     # -------------------------------------------------------------------------
     # Generate data
@@ -19,12 +19,11 @@ def main():
     filepath = os.path.join(cur, '../outputs/megasample_cleaned.csv')
 
     train_data, val_data, test_data = data_validation(filepath)
-
+    test_batch_size = test_data.element_spec[0].shape[0]
     # Train VAE
     save_dir = os.path.join(cur, '../outputs/models/vae/vae1/')
-    train_vae(train_data, batch_size, epochs, lr, h_dim, z_dim, save_dir)
-    results = test_vae(test_data, save_dir)
-    print(np.mean(results))
+    train_val_vae(train_data, val_data, batch_size, epochs, lr, h_dim, z_dim, save_dir)
+    results = test_vae_from_file(test_data, save_dir, test_batch_size)
 
 
 if __name__ == "__main__":

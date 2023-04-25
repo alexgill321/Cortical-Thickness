@@ -161,14 +161,17 @@ class VAE(keras.Model):
             "lr": self.optimizer.lr
         }
 
-    def eval(self, data):
-        data = data.batch(len(data))
-        batch = next(iter(data))
-        _, _, _, output = self(batch)
-        x, y = batch
-        results = tf.keras.metrics.MSE(x, output)
-        # TODO: Return y loss as y_results
-        return results
+    def test_step(self, batch_data):
+        x, y = batch_data
+        z_mean, z_log_var, z, x_reconstructed = self(batch_data, training=False)
+        reconstruction_loss = self.reconstruction_loss_fn(x, x_reconstructed)
+        kl_loss = tf.reduce_mean(self.kl_loss_fn(z_mean, z_log_var))
+        total_loss = reconstruction_loss + kl_loss
+        return {
+            "reconstruction_loss": reconstruction_loss,
+            "kl_loss": kl_loss,
+            "total_loss": total_loss,
+        }
 
     def call(self, data, training=False, mask=None):
         x, y = data
