@@ -83,7 +83,7 @@ class VAEDecoder(keras.Model):
             ))
         self.output_layer = tf.keras.layers.Dense(
             self.output_dim,
-            activation='softmax',
+            activation='linear',
             kernel_initializer=self.initializer
         )
 
@@ -149,7 +149,6 @@ class VAE(keras.Model):
             z_mean, z_log_var, z, x_reconstructed = self(batch_data, training=True)
             reconstruction_loss = self.reconstruction_loss_fn(x, x_reconstructed)
             kl_loss = tf.reduce_mean(self.kl_loss_fn(z_mean, z_log_var))
-
             total_loss = reconstruction_loss + kl_loss
         grads = tape.gradient(total_loss, self.trainable_weights)
 

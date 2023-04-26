@@ -5,7 +5,7 @@ from sklearn.model_selection import train_test_split
 import tensorflow as tf
 
 
-def generate_data(filepath, scaler=StandardScaler(), validation_split=None):
+def generate_data(filepath):
     """
     Generate data to be used in model training
 
@@ -29,6 +29,7 @@ def generate_data(filepath, scaler=StandardScaler(), validation_split=None):
     test_x = db.loc[~db.index.isin(condition_indices)]
 
     y_data = np.concatenate((one_hot_age, one_hot_sex), axis=1).astype('float32')
+    scaler = StandardScaler()
     train_x_norm = scaler.fit_transform(train_x)
     test_x_norm = scaler.transform(test_x)
     train_y = y_data[condition_indices, :]
@@ -37,25 +38,26 @@ def generate_data(filepath, scaler=StandardScaler(), validation_split=None):
     return train_x_norm, train_y, test_x_norm, test_y
 
 
-def data_train_test(filepath, scaler=StandardScaler()):
+def data_train_test(filepath):
     """
     Generate data to be used in model training
 
     splits the data from the csv file into training test and validation sets
     """
-    train_x, train_y, test_x, test_y = generate_data(filepath, scaler)
+
+    train_x, train_y, test_x, test_y = generate_data(filepath)
     train = tf.data.Dataset.from_tensor_slices((train_x, train_y))
     test = tf.data.Dataset.from_tensor_slices((test_x, test_y))
     return train, test
 
 
-def data_validation(filepath, scaler=StandardScaler(), validation_split=0.2):
+def data_validation(filepath, validation_split=0.2):
     """
     Generate data to be used in model training
 
     splits the data from the csv file into training test and validation sets
     """
-    train_x, train_y, test_x, test_y = generate_data(filepath, scaler)
+    train_x, train_y, test_x, test_y = generate_data(filepath)
     train_x, val_x, train_y, val_y = train_test_split(train_x, train_y, test_size=validation_split)
     train = tf.data.Dataset.from_tensor_slices((train_x, train_y))
     test = tf.data.Dataset.from_tensor_slices((test_x, test_y))

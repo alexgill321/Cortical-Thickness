@@ -11,8 +11,8 @@ def main():
     h_dim = [100]
     z_dim = 20
     batch_size = 64
-    epochs = 100
-    lr = 0.001
+    epochs = 2000
+    lr = 0.00014
     # -------------------------------------------------------------------------
     # Generate data
     cur = os.getcwd()
