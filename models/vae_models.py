@@ -1,5 +1,6 @@
 import tensorflow as tf
 from tensorflow import keras
+from models.model import AEModel
 import sys
 
 
@@ -12,7 +13,7 @@ class VAEEncoder(keras.Model):
     the output of the hidden layers is used to predict the class of the input data.
     """
     def __init__(self, hidden_dim, latent_dim, activation='relu', initializer='glorot_uniform', dropout_rate=0.2):
-        super(VAEEncoder, self).__init__()
+        super(AEModel, self).__init__()
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
         self.dropout_rate = dropout_rate
@@ -115,7 +116,7 @@ def calc_kl_loss(mu, log_var):
     return loss
 
 
-class VAE(keras.Model):
+class VAE(AEModel):
     """
     Class for creation, training, and evaluation of a Variational Autoencoder model
     """
@@ -124,24 +125,29 @@ class VAE(keras.Model):
             encoder,
             decoder,
     ):
-        super(VAE, self).__init__()
-        self.encoder = encoder
-        self.decoder = decoder
+        super(AEModel, self).__init__()
         self.reconstruction_loss_fn = None
         self.kl_loss_fn = None
         self.optimizer = None
 
-    def compile(
-            self,
-            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
-            reconstruction_loss_fn=tf.keras.losses.MeanSquaredError(),
-            kl_loss_fn=calc_kl_loss,
-            **kwargs
+    def compile(self, optimizer, reconstruction_loss_fn, **kwargs):
+        self,
+        encoder_optimizer=tf.keras.optimizers.Adam(),
+        generator_optimizer=tf.keras.optimizers.Adam(),
+        discriminator_optimizer=tf.keras.optimizers.Adam(),
+        generator_loss_fn=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+        autoencoder_loss_fn=tf.keras.losses.MeanSquaredError(),
+        discriminator_loss_fn=discriminator_loss,
+        **kwargs
     ):
-        super(VAE, self).compile(**kwargs)
-        self.optimizer = optimizer
-        self.reconstruction_loss_fn = reconstruction_loss_fn
-        self.kl_loss_fn = kl_loss_fn
+    super(AAE, self).compile(**kwargs)
+    self.autoencoder_optimizer = encoder_optimizer
+    self.discriminator_optimizer = discriminator_optimizer
+    self.generator_optimizer = generator_optimizer
+    self.generator_loss_fn = generator_loss_fn
+    self.autoencoder_loss_fn = autoencoder_loss_fn
+    self.discriminator_loss_fn = discriminator_loss_fn
+
 
     def train_step(self, batch_data):
         x, y = batch_data

@@ -40,7 +40,7 @@ def train_vae(data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20,
     vae_optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
 
     # Compile model
-    vae.compile(vae_optimizer)
+    vae.compile(,
 
     # Train model
     vae.fit(data, batch_size=batch_size, epochs=epochs)
@@ -52,6 +52,7 @@ def train_vae(data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20,
         vae.encoder.save(os.path.join(savefile, 'encoder'), save_format="tf")
         vae.decoder.save(os.path.join(savefile, 'decoder'), save_format="tf")
     return vae
+
 
 def train_val_vae(train_data, val_data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20, savefile=None):
     """Create, train, and save a VAE model
@@ -90,7 +91,7 @@ def train_val_vae(train_data, val_data, batch_size=256, epochs=200, lr=0.0001, h
     vae_optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
 
     # Compile model
-    vae.compile(vae_optimizer)
+    vae.compile(,
 
     # Train model
     vae.fit(train_data, epochs=epochs, validation_data=val_data)
@@ -122,7 +123,7 @@ def test_vae_from_file(test_data, savefile, batch_size=256):
 
     # create vae instance
     vae = VAE(encoder, decoder)
-    vae.compile()
+    vae.compile(,
 
     # run test data through vae, saving resulting loss values for each sample
     test_data = test_data.batch(batch_size)
@@ -130,7 +131,8 @@ def test_vae_from_file(test_data, savefile, batch_size=256):
     return output
 
 
-def cross_validate_vae(data, k=5, batch_size=256, epochs=200, lr_values=[0.0001], h_dim_values=[[100, 100]], z_dim_values=[20]):
+def cross_validate_vae(data, k=5, batch_size=256, epochs=200, lr_values=None,
+                       h_dim_values=None, z_dim_values=None):
     """Perform k-fold cross-validation for VAE model with different parameter combinations.
 
     Args:
@@ -146,11 +148,17 @@ def cross_validate_vae(data, k=5, batch_size=256, epochs=200, lr_values=[0.0001]
         A tuple containing the best parameters and their corresponding average validation loss.
     """
     # Convert the dataset to a list of (x, y) pairs
+    if lr_values is None:
+        lr_values = [0.0001]
+    if h_dim_values is None:
+        h_dim_values = [[100, 100]]
+    if z_dim_values is None:
+        z_dim_values = [20]
     data_list = list(data.as_numpy_iterator())
 
     # Initialize k-fold cross-validation
     kf = KFold(n_splits=k)
-
+    n_features = data_list[0][0].shape[1]
     best_params = None
     best_loss = float('inf')
 
@@ -168,8 +176,9 @@ def cross_validate_vae(data, k=5, batch_size=256, epochs=200, lr_values=[0.0001]
                     # Create and train the VAE model with the current parameter combination
                     vae = create_vae(n_features, h_dim, z_dim)
                     vae_optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
-                    vae.compile(vae_optimizer)
-                    vae.fit(train_data.batch(batch_size), epochs=epochs, validation_data=val_data.batch(batch_size), verbose=0)
+                    vae.compile(,
+                    vae.fit(train_data.batch(batch_size), epochs=epochs, validation_data=val_data.batch(batch_size),
+                            verbose=0)
 
                     # Compute the validation loss
                     val_loss = vae.evaluate(val_data.batch(batch_size), verbose=0)
@@ -224,7 +233,7 @@ def find_learning_rate(train_data, batch_size=256, h_dim=None, z_dim=20, min_lr=
     vae_optimizer = tf.keras.optimizers.Adam(learning_rate=initial_lr)
 
     # Compile model
-    vae.compile(vae_optimizer)
+    vae.compile(,
 
     # Define learning rate update function
     def update_learning_rate(batch, logs):
