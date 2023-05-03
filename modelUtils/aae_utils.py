@@ -55,7 +55,7 @@ def train_aae(data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20,
     # Create learning rate scheduler callback
     lr_schedules = [encoder_lr_schedule, discriminator_lr_schedule, generator_lr_schedule]
     optimizers = [aae.autoencoder_optimizer, aae.discriminator_optimizer, aae.generator_optimizer]
-    lr_callback = MultiOptimizerLearningRateScheduler(lr_schedules)
+    lr_callback = MultiOptimizerLearningRateScheduler(lr_schedules, optimizers)
     callbacks = [lr_callback]
 
     # Train model
