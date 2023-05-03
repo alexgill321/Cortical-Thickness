@@ -49,7 +49,7 @@ def get_lr_scheduler(scheduler, **kwargs):
         raise ValueError("Invalid scheduler provided: " + scheduler)
 
 
-def find_learning_rate(train_data, model, min_lr=1e-8, max_lr=1, n_steps=100, optimizer_name=None):
+def find_learning_rate(train_data, model, min_lr=1e-8, max_lr=0.1, n_steps=100, batch_size=128, optimizer_name=None):
     """Find the optimal learning rate for an Autoencoder model.
 
     Args:
@@ -57,24 +57,23 @@ def find_learning_rate(train_data, model, min_lr=1e-8, max_lr=1, n_steps=100, op
         model (tf.keras.Model): AE model to test the learning rates on.
         min_lr (float, optional): Minimum learning rate to test. Defaults to 1e-8.
         max_lr (float, optional): Maximum learning rate to test. Defaults to 1.
-        n_steps (int, optional): Number of batches to train the model for. Defaults to 100.
+        n_steps (int, optional): Number of lr updates to perform between the min and max lr. Defaults to 100.
+        batch_size (int, optional): Batch size to use. Defaults to 128.
         optimizer_name (str, optional): Name of the optimizer to use. Defaults to None, which uses the default optimizer
         of the model.
 
     Returns:
         A tuple containing the learning rates and corresponding losses.
     """
-    # Change batch size to modify the number of iterations for the learning rate finder
-    batch_size = 128
 
     # Batch data
     train_data = train_data.batch(batch_size).repeat()
-    n_features = train_data.element_spec[0].shape[1]
+    n_features = tf.data.experimental.cardinality(train_data).numpy()
 
     # Create optimizer
     initial_lr = min_lr
     optimizer = tf.keras.optimizers.Adam(learning_rate=initial_lr)
-
+    model.compile()
     # Update optimizer of model, add support for models with different optimizers
     if optimizer_name is None:
         model.optimizer = optimizer
@@ -95,15 +94,14 @@ def find_learning_rate(train_data, model, min_lr=1e-8, max_lr=1, n_steps=100, op
     # Define learning rate update callback
     lr_update_callback = LambdaCallback(on_batch_end=update_learning_rate)
 
-    # Store losses and learning rates
-    rec_losses = []
-    kl_losses = []
-    lrs = []
+    # Store model logs in a dictionary
+    log_dict = {}
 
     def save_losses(batch, logs):
-        rec_losses.append(logs['reconstruction_loss'])
-        kl_losses.append(logs['kl_loss'])
-        lrs.append(tf.keras.backend.get_value(optimizer.lr))
+        for key, value in logs.items():
+            if key not in log_dict:
+                log_dict[key] = []
+            log_dict[key].append(value)
 
     # Define loss saving callback
     loss_saving_callback = LambdaCallback(on_batch_end=save_losses)
@@ -112,4 +110,4 @@ def find_learning_rate(train_data, model, min_lr=1e-8, max_lr=1, n_steps=100, op
     model.fit(train_data, callbacks=[lr_update_callback, loss_saving_callback], steps_per_epoch=n_steps, epochs=1,
               verbose=0)
 
-    return lrs, rec_losses, kl_losses
+    return log_dict

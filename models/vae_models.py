@@ -1,6 +1,5 @@
 import tensorflow as tf
 from tensorflow import keras
-from models.model import AEModel
 import sys
 
 
@@ -116,7 +115,7 @@ def calc_kl_loss(mu, log_var):
     return loss
 
 
-class VAE(AEModel):
+class VAE(keras.Model):
     """
     Class for creation, training, and evaluation of a Variational Autoencoder model
     """
@@ -125,7 +124,7 @@ class VAE(AEModel):
             encoder,
             decoder,
     ):
-        super(AEModel, self).__init__()
+        super(VAE, self).__init__()
         self.encoder = encoder
         self.decoder = decoder
         self.reconstruction_loss_fn = None
