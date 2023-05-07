@@ -133,6 +133,58 @@ def discriminator_loss(real_output, fake_output):
     return loss_fake + loss_real
 
 
+class AAEOptimizer(tf.keras.optimizers.Optimizer):
+    def __init__(
+        self,
+        enc_optimizer=tf.keras.optimizers.Adam(),
+        gen_optimizer=tf.keras.optimizers.Adam(),
+        disc_optimizer=tf.keras.optimizers.Adam(),
+        name='AAEOptimizer',
+        **kwargs
+    ):
+        super().__init__(
+            name=name,
+            **kwargs
+        )
+        self.encoder_optimizer = enc_optimizer
+        self.generator_optimizer = gen_optimizer
+        self.discriminator_optimizer = disc_optimizer
+        self.name = name
+
+    def build(self, var_list):
+        self.encoder_optimizer.build(var_list)
+        self.generator_optimizer.build(var_list)
+        self.discriminator_optimizer.build(var_list)
+
+        super().build(var_list)
+
+    def update_step(self, gradient, variable):
+        encoder_grads_and_vars = []
+        generator_grads_and_vars = []
+        discriminator_grads_and_vars = []
+
+        for grad, var in zip(gradient, variable):
+            if 'autoencoder' in var.name:
+                encoder_grads_and_vars.append((grad, var))
+            elif 'encoder' in var.name:
+                generator_grads_and_vars.append((grad, var))
+            elif 'discriminator' in var.name:
+                discriminator_grads_and_vars.append((grad, var))
+
+        self.encoder_optimizer.apply_gradients(encoder_grads_and_vars)
+        self.generator_optimizer.apply_gradients(generator_grads_and_vars)
+        self.discriminator_optimizer.apply_gradients(discriminator_grads_and_vars)
+
+    def get_config(self):
+        config = super(AAEOptimizer, self).get_config()
+        config.update({
+            "encoder_optimizer": self.encoder_optimizer,
+            "generator_optimizer": self.generator_optimizer,
+            "discriminator_optimizer": self.discriminator_optimizer,
+        })
+        return config
+
+
 class AAE(keras.Model):
     def __init__(
             self,
@@ -150,24 +202,18 @@ class AAE(keras.Model):
         self.autoencoder_loss_fn = None
         self.discriminator_loss_fn = None
         self.generator_loss_fn = None
-        self.autoencoder_optimizer = None
-        self.discriminator_optimizer = None
-        self.generator_optimizer = None
+        self.optimizer = None
 
     def compile(
         self,
-        encoder_optimizer=tf.keras.optimizers.Adam(),
-        generator_optimizer=tf.keras.optimizers.Adam(),
-        discriminator_optimizer=tf.keras.optimizers.Adam(),
+        optimizer=AAEOptimizer(),
         generator_loss_fn=tf.keras.losses.BinaryCrossentropy(from_logits=True),
         autoencoder_loss_fn=tf.keras.losses.MeanSquaredError(),
         discriminator_loss_fn=discriminator_loss,
         **kwargs
     ):
         super(AAE, self).compile(**kwargs)
-        self.autoencoder_optimizer = encoder_optimizer
-        self.discriminator_optimizer = discriminator_optimizer
-        self.generator_optimizer = generator_optimizer
+        self.optimizer = optimizer
         self.generator_loss_fn = generator_loss_fn
         self.autoencoder_loss_fn = autoencoder_loss_fn
         self.discriminator_loss_fn = discriminator_loss_fn
@@ -178,7 +224,7 @@ class AAE(keras.Model):
             # -------------------------------------------------------------------------------------------------------------
             # Autoencoder
             encoder_output = self.encoder(batch_x, training=True)
-            decoder_output = self.decoder(tf.concat([encoder_output, batch_y], axis=1), training=True)
+            decoder_output = self.decoder(encoder_output, training=True)
 
             # Autoencoder loss
             ae_loss = self.autoencoder_loss_fn(batch_x, decoder_output)
@@ -206,26 +252,25 @@ class AAE(keras.Model):
             # Generator loss
             gen_loss = self.generator_loss_fn(tf.ones_like(dc_fake), dc_fake)
 
-        ae_grads = ae_tape.gradient(ae_loss, self.encoder.trainable_variables + self.decoder.trainable_variables)
-        self.autoencoder_optimizer.apply_gradients(
-            zip(ae_grads, self.encoder.trainable_variables + self.decoder.trainable_variables))
-
+        ae_vars = self.encoder.trainable_variables + self.decoder.trainable_variables
+        ae_vars.name = 'autoencoder'
+        ae_grads = ae_tape.gradient(ae_loss, ae_vars)
         dc_grads = dc_tape.gradient(dc_loss, self.discriminator.trainable_variables)
-        self.discriminator_optimizer.apply_gradients(
-            zip(dc_grads, self.discriminator.trainable_variables))
-
         gen_grads = gen_tape.gradient(gen_loss, self.encoder.trainable_variables)
-        self.generator_optimizer.apply_gradients(
-            zip(gen_grads, self.encoder.trainable_variables))
+
+        # Merge the gradients from the different tapes
+        grads_and_vars = (list(zip(ae_grads, self.encoder.trainable_variables + self.decoder.trainable_variables)) +
+                          list(zip(dc_grads, self.discriminator.trainable_variables)) +
+                          list(zip(gen_grads, self.encoder.trainable_variables)))
+
+        # Apply the gradients using the custom optimizer
+        self.optimizer.apply_gradients(grads_and_vars)
 
         return {
             "ae_loss": ae_loss,
             "dc_loss": dc_loss,
             "dc_acc": dc_acc,
             "gen_loss": gen_loss,
-            "disc_lr": self.discriminator_optimizer.lr,
-            "gen_lr": self.generator_optimizer.lr,
-            "ae_lr": self.autoencoder_optimizer.lr
         }
 
     def eval(self, data):
@@ -239,7 +284,7 @@ class AAE(keras.Model):
     def call(self, data, training=False, mask=None):
         x, y = data
         encoder_output = self.encoder(x, training=False)
-        decoder_output = self.decoder(tf.concat([encoder_output, y], axis=1), training=False)
+        decoder_output = self.decoder(encoder_output, training=False)
         return decoder_output
 
     def get_config(self):
@@ -258,7 +303,4 @@ class AAE(keras.Model):
         z_dim = config["z_dim"]
         return cls(encoder, decoder, discriminator, z_dim)
 
-
-
-
-
+#%%

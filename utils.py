@@ -52,10 +52,15 @@ def data_train_test(filepath):
 
 
 def data_validation(filepath, validation_split=0.2):
-    """
-    Generate data to be used in model training
+    """ Generate data to be used in model training
 
     splits the data from the csv file into training test and validation sets
+
+    Args:
+        filepath (str): path to the csv file containing the data
+        validation_split (float): fraction of the data to be used for validation
+
+    Returns: Tuple of tf.data.Dataset objects containing the training, validation and test data in that order.
     """
     train_x, train_y, test_x, test_y = generate_data(filepath)
     train_x, val_x, train_y, val_y = train_test_split(train_x, train_y, test_size=validation_split)

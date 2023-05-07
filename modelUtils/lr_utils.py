@@ -4,49 +4,75 @@ from keras.callbacks import Callback, LambdaCallback
 import numpy as np
 
 
-class ExponentialDecayScheduler(Callback):
+class ExponentialDecayScheduler:
     def __init__(self, initial_lr, decay_rate, decay_steps):
         super().__init__()
         self.initial_lr = initial_lr
         self.decay_rate = decay_rate
         self.decay_steps = decay_steps
+        self.iteration = 0
 
-    def on_batch_end(self, batch, logs=None):
-        new_lr = self.initial_lr * self.decay_rate**(batch / self.decay_steps)
-        tf.keras.backend.set_value(self.model.optimizer.lr, new_lr)
+    def get_lr(self):
+        new_lr = self.initial_lr * self.decay_rate**(self.iteration / self.decay_steps)
+        return new_lr
+
+    def step(self):
+        lr = self.get_lr()
+        self.iteration += 1
+        return lr
 
 
-class CyclicLRScheduler(Callback):
-    def __init__(self, base_lr, max_lr, step_size, mode="triangular"):
-        super().__init__()
+class CyclicLR:
+    """Scheduler that implements a cyclical learning rate policy (CLR).
+
+     Cycles the learning rate between two boundaries with some constant frequency,
+     as detailed in the paper `Cyclical Learning Rates for Training Neural Networks`_.
+     """
+    def __init__(self, base_lr, step_size, max_lr=.005, mode="triangular"):
         self.base_lr = base_lr
         self.max_lr = max_lr
         self.step_size = step_size
         self.mode = mode
+        self.iteration = 0
 
-    def on_batch_begin(self, batch, logs=None):
-        cycle = math.floor(1 + batch / (2 * self.step_size))
-        x = abs(batch / self.step_size - 2 * cycle + 1)
+    def get_lr(self):
+        cycle = math.floor(1 + self.iteration / (2 * self.step_size))
+        x = abs(self.iteration / self.step_size - 2 * cycle + 1)
+
         if self.mode == "triangular":
-            scale_factor = 1
+            lr = self.base_lr + (self.max_lr - self.base_lr) * max(0, (1 - x))
         elif self.mode == "triangular2":
-            scale_factor = 1 / (2**(cycle - 1))
+            lr = self.base_lr + (self.max_lr - self.base_lr) * max(0, (1 - x)) / (2 ** (cycle - 1))
         elif self.mode == "exp_range":
-            scale_factor = self.gamma ** batch
+            gamma = 0.999
+            lr = self.base_lr + (self.max_lr - self.base_lr) * max(0, (1 - x)) * (gamma ** self.iteration)
         else:
-            raise ValueError("Invalid mode provided: " + self.mode)
+            raise ValueError("Invalid mode: choose from 'triangular', 'triangular2', or 'exp_range'.")
 
-        new_lr = self.base_lr + (self.max_lr - self.base_lr) * max(0, (1 - x)) * scale_factor
-        tf.keras.backend.set_value(self.model.optimizer.lr, new_lr)
+        return lr
+
+    def step(self):
+        lr = self.get_lr()
+        self.iteration += 1
+        return lr
 
 
-def get_lr_scheduler(scheduler, **kwargs):
-    if scheduler == "exponential_decay":
-        return ExponentialDecayScheduler(kwargs['initial_lr'], kwargs['decay_rate'], kwargs['decay_steps'])
-    elif scheduler == "cyclic":
-        return CyclicLRScheduler(kwargs['base_lr'], kwargs['max_lr'], kwargs['step_size'], kwargs['mode'])
-    else:
-        raise ValueError("Invalid scheduler provided: " + scheduler)
+class MultiOptimizerLearningRateScheduler(tf.keras.callbacks.LearningRateScheduler):
+    """Learning rate scheduler that can be used with multiple optimizers.
+
+    Args:
+        lr_schedules (list): List of learning rate schedules to use for each optimizer.
+        optimizers (list): List of optimizers to use.
+    """
+    def __init__(self, lr_schedules, optimizers, **kwargs):
+        super(MultiOptimizerLearningRateScheduler, self).__init__(lr_schedules[0], **kwargs)
+        self.lr_schedules = lr_schedules
+        self.optimizers = optimizers
+
+    def on_epoch_begin(self, epoch, logs=None):
+        for i, optimizer in enumerate(self.optimizers):
+            lr = self.lr_schedules[i].step()
+            optimizer.lr.assign(lr)
 
 
 def find_learning_rate(train_data, model, min_lr=1e-8, max_lr=0.1, n_steps=100, batch_size=128, optimizer_name=None):

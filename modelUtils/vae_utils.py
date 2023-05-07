@@ -31,7 +31,6 @@ def train_vae(data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20,
     # Batch data
     data = data.batch(batch_size)
     n_features = data.element_spec[0].shape[1]
-    n_labels = data.element_spec[1].shape[1]
 
     # Create vae model
     vae = create_vae(n_features, h_dim, z_dim)
@@ -82,7 +81,6 @@ def train_val_vae(train_data, val_data, batch_size=256, epochs=200, lr=0.0001, h
     train_data = train_data.batch(batch_size)
     val_data = val_data.batch(batch_size)
     n_features = train_data.element_spec[0].shape[1]
-    n_labels = train_data.element_spec[1].shape[1]
 
     # Create vae model
     vae = create_vae(n_features, h_dim, z_dim)
