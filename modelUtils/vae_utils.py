@@ -4,113 +4,29 @@ from sklearn.model_selection import KFold
 import os
 
 
-def train_vae(data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20, savefile=None):
-    """Create, train, and save a VAE model
+def save_vae(vae, savefile):
+    """ Save a VAE model.
 
     Args:
-        data (tf.data.Dataset):
-         Dataset to train the model on.
-        batch_size (int, optional):
-         Batch size to use for training.
-        epochs (int, optional):
-         Number of epochs to train for.
-        lr (float, optional):
-         Learning rate to use for training.
-        h_dim (list, optional):
-         List of hidden layer dimensions.
-        z_dim (int, optional):
-         Dimension of latent space.
-        savefile (str, optional):
-         Path to save the model to.
+        vae (VAE): VAE model to be saved.
+        savefile (str): Path to save the model to.
     """
-    if h_dim is None:
-        h_dim = [100, 100]
-
-    # Batch data
-    data = data.batch(batch_size)
-    n_features = data.element_spec[0].shape[1]
-
-    # Create vae model
-    vae = create_vae(n_features, h_dim, z_dim)
-
-    # Create optimizer
-    vae_optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
-
-    # Compile model
-    vae.compile(optimizer=vae_optimizer)
-
-    # Train model
-    vae.fit(data, batch_size=batch_size, epochs=epochs)
-
-    # Save model
-    if savefile is not None:
-        if not os.path.exists(savefile): 
-            os.makedirs(savefile)
-        vae.encoder.save(os.path.join(savefile, 'encoder'), save_format="tf")
-        vae.decoder.save(os.path.join(savefile, 'decoder'), save_format="tf")
-    return vae
+    if not os.path.exists(savefile):
+        os.makedirs(savefile)
+    vae.encoder.save(os.path.join(savefile, 'encoder'), save_format="tf")
+    vae.decoder.save(os.path.join(savefile, 'decoder'), save_format="tf")
 
 
-def train_val_vae(train_data, val_data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20, savefile=None):
-    """Create, train, and save a VAE model
+def load_vae(savefile):
+    """ Load a VAE model from a savefile
+
+    Loads and creates a VAE model from a savefile, returns the un-compiled model. If the model needs to be
+    trained further it must be compiled with the desired optimizers, loss functions and callbacks.
 
     Args:
-        train_data (tf.data.Dataset):
-         Dataset to train the model on.
-        val_data (tf.data.Dataset):
-         Dataset to validate the model on.
-        batch_size (int, optional):
-         Batch size to use for training.
-        epochs (int, optional):
-         Number of epochs to train for.
-        lr (float, optional):
-         Learning rate to use for training.
-        h_dim (list, optional):
-         List of hidden layer dimensions.
-        z_dim (int, optional):
-         Dimension of latent space.
-        savefile (str, optional):
-         Path to save the model to.
-    """
-    if h_dim is None:
-        h_dim = [100, 100]
+        savefile (str): Path to the model to load.
 
-    # Batch data
-    train_data = train_data.batch(batch_size)
-    val_data = val_data.batch(batch_size)
-    n_features = train_data.element_spec[0].shape[1]
-
-    # Create vae model
-    vae = create_vae(n_features, h_dim, z_dim)
-
-    # Create optimizer
-    vae_optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
-
-    # Compile model
-    vae.compile(optimizer=vae_optimizer)
-
-    # Train model
-    vae.fit(train_data, epochs=epochs, validation_data=val_data)
-
-    # Save model
-    if savefile is not None:
-        if not os.path.exists(savefile):
-            os.makedirs(savefile)
-        vae.encoder.save(os.path.join(savefile, 'encoder'), save_format="tf")
-        vae.decoder.save(os.path.join(savefile, 'decoder'), save_format="tf")
-
-
-def test_vae_from_file(test_data, savefile, batch_size=256):
-    """Evaluate a VAE model over a dataset.
-
-    Args:
-        test_data (tf.data.Dataset):
-            Dataset to evaluate the model on.
-        savefile (str):
-            Path to the model to evaluate.
-
-    Returns:
-        Output of the model on the dataset. Stored as a list of loss values for each sample.
+    Returns: VAE model loaded with the pretrained encoder and decoder weights.
     """
 
     # restore encoder, decoder from savefile
@@ -119,26 +35,62 @@ def test_vae_from_file(test_data, savefile, batch_size=256):
 
     # create vae instance
     vae = VAE(encoder, decoder)
-    vae.compile()
-
-    # run test data through vae, saving resulting loss values for each sample
-    test_data = test_data.batch(batch_size)
-    output = vae.evaluate(test_data)
-    return output
+    return vae
 
 
-def cross_validate_vae(data, k=5, batch_size=256, epochs=200, lr_values=None,
-                       h_dim_values=None, z_dim_values=None):
+def create_vae(n_features, h_dim, z_dim):
+    """ Creates a VAE model with the given parameters.
+
+    Creates an un-compiled VAE model with the given parameters. The model must be compiled with the desired
+    optimizers, loss functions and callbacks before it can be trained.
+
+    Args:
+        n_features (int): Number of features in the input data.
+        h_dim (list): List of hidden layer dimensions.
+        z_dim (int): Dimension of latent space.
+
+    Returns: Un-compiled VAE model with the given parameters.
+    """
+    encoder = VAEEncoder(h_dim, z_dim)
+    decoder = VAEDecoder(h_dim, n_features)
+    vae = VAE(encoder, decoder)
+    return vae
+
+
+def train_val_vae(vae, data, batch_size=256, epochs=200, save=False):
+    """ Train and validate a VAE model.
+
+    Trains and validates a VAE model on the given training and validation data. The model is trained for the given
+    number of epochs and the best model is saved if save=True.
+
+    Args:
+        vae (VAE): VAE model to train. Needs to be compiled with the desired optimizers, loss functions and callbacks.
+        data
+        batch_size (int): Batch size.
+        epochs (int): Number of epochs to train for.
+        save (bool): If True, the best model is saved.
+
+    Returns: Best model, as determined by the lowest validation loss.
+    """
+
+    stop_early = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
+
+    vae.fit(data.batch(batch_size), epochs=epochs, validation_split=0.2, callbacks=[stop_early])
+
+    if save:
+        save_vae(vae, save)
+
+
+    return vae
+
+
+def cross_validate_vae(data, k=5, param_dict=None, batch_size=256, epochs=200):
     """Perform k-fold cross-validation for VAE model with different parameter combinations.
 
     Args:
         data (tf.data.Dataset): Dataset to perform cross-validation on.
         k (int, optional): Number of folds for cross-validation.
-        batch_size (int, optional): Batch size to use for training.
-        epochs (int, optional): Number of epochs to train for.
-        lr_values (list, optional): List of learning rate values to test.
-        h_dim_values (list, optional): List of hidden layer dimension combinations to test.
-        z_dim_values (list, optional): List of latent space dimension values to test.
+
 
     Returns:
         A tuple containing the best parameters and their corresponding average validation loss.
