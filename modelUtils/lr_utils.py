@@ -1,15 +1,35 @@
 import math
 import tensorflow as tf
-from keras.callbacks import Callback, LambdaCallback
+from keras.callbacks import LambdaCallback
 import numpy as np
 
 
 class ExponentialDecayScheduler:
+    """Scheduler that implements exponential decay.
+
+    Implements exponential decay of the learning rate with a given decay rate and decay steps. The learning rate
+    is updated via callbacks at the beginning of each epoch. The learning rate is updated according to the formula:
+    lr = initial_lr * decay_rate^(iteration / decay_steps)
+
+    Args:
+        initial_lr (float): Initial learning rate.
+        decay_rate (float): Decay rate.
+        decay_steps (int): Number of steps between each decay.
+
+    Attributes:
+        initial_lr (float): Initial learning rate.
+        decay_rate (float): Decay rate.
+        decay_steps (int): Number of steps between each decay.
+        lr (float): Current learning rate.
+        iteration (int): Current iteration.
+    """
+
     def __init__(self, initial_lr, decay_rate, decay_steps):
         super().__init__()
         self.initial_lr = initial_lr
         self.decay_rate = decay_rate
         self.decay_steps = decay_steps
+        self.lr = initial_lr
         self.iteration = 0
 
     def get_lr(self):
@@ -17,9 +37,9 @@ class ExponentialDecayScheduler:
         return new_lr
 
     def step(self):
-        lr = self.get_lr()
+        self.lr = self.get_lr()
         self.iteration += 1
-        return lr
+        return self.lr
 
 
 class CyclicLR:
@@ -27,10 +47,24 @@ class CyclicLR:
 
      Cycles the learning rate between two boundaries with some constant frequency,
      as detailed in the paper `Cyclical Learning Rates for Training Neural Networks`_.
+
+     Args:
+        base_lr (float): Initial learning rate which is the lower boundary in the cycle.
+        max_lr (float): Upper boundary in the cycle. Functionally, it defines the cycle amplitude (max_lr - base_lr).
+        step_size (int): Number of training iterations per half cycle. Authors suggest setting step_size
+
+    Attributes:
+        base_lr (float): Initial learning rate which is the lower boundary in the cycle.
+        max_lr (float): Upper boundary in the cycle. Functionally, it defines the cycle amplitude (max_lr - base_lr).
+        lr (float): Current learning rate.
+        step_size (int): Number of training iterations per half cycle. Authors suggest setting step_size
+        mode (str): One of {triangular, triangular2, exp_range}. Default 'triangular'.
+        iteration (int): Current iteration.
      """
     def __init__(self, base_lr, step_size, max_lr=.005, mode="triangular"):
         self.base_lr = base_lr
         self.max_lr = max_lr
+        self.lr = base_lr
         self.step_size = step_size
         self.mode = mode
         self.iteration = 0
@@ -40,39 +74,46 @@ class CyclicLR:
         x = abs(self.iteration / self.step_size - 2 * cycle + 1)
 
         if self.mode == "triangular":
-            lr = self.base_lr + (self.max_lr - self.base_lr) * max(0, (1 - x))
+            lr = self.base_lr + (self.max_lr - self.base_lr) * max(0.0, (1 - x))
         elif self.mode == "triangular2":
-            lr = self.base_lr + (self.max_lr - self.base_lr) * max(0, (1 - x)) / (2 ** (cycle - 1))
+            lr = self.base_lr + (self.max_lr - self.base_lr) * max(0.0, (1 - x)) / (2 ** (cycle - 1))
         elif self.mode == "exp_range":
             gamma = 0.999
-            lr = self.base_lr + (self.max_lr - self.base_lr) * max(0, (1 - x)) * (gamma ** self.iteration)
+            lr = self.base_lr + (self.max_lr - self.base_lr) * max(0.0, (1 - x)) * (gamma ** self.iteration)
         else:
             raise ValueError("Invalid mode: choose from 'triangular', 'triangular2', or 'exp_range'.")
-
         return lr
 
     def step(self):
-        lr = self.get_lr()
+        self.lr = self.get_lr()
         self.iteration += 1
-        return lr
+        return self.lr
 
 
 class MultiOptimizerLearningRateScheduler(tf.keras.callbacks.LearningRateScheduler):
     """Learning rate scheduler that can be used with multiple optimizers.
 
+    Assigns learning rates to each of the optimizer, learning rate pairs provided. The learning rate
+    is updated via callbacks at the beginning of each epoch.
     Args:
-        lr_schedules (list): List of learning rate schedules to use for each optimizer.
-        optimizers (list): List of optimizers to use.
+        lr_and_optimizers (list): List of tuples of the form (lr_schedule, optimizer), with each lr_schedule
+        corresponding to an optimizer.
     """
-    def __init__(self, lr_schedules, optimizers, **kwargs):
-        super(MultiOptimizerLearningRateScheduler, self).__init__(lr_schedules[0], **kwargs)
-        self.lr_schedules = lr_schedules
-        self.optimizers = optimizers
+    def __init__(self, lr_and_optimizers, **kwargs):
+        super(MultiOptimizerLearningRateScheduler, self).__init__(schedule=None, **kwargs)
+        self.lr_schedulers = []
+        self.optimizers = []
+        for lr_schedule, optimizer in lr_and_optimizers:
+            self.lr_schedulers.append(lr_schedule)
+            self.optimizers.append(optimizer)
+
+    def step(self):
+        for i in range(len(self.lr_schedulers)):
+            tf.keras.backend.set_value(self.optimizers[i].lr, self.lr_schedulers[i].step())
 
     def on_epoch_begin(self, epoch, logs=None):
-        for i, optimizer in enumerate(self.optimizers):
-            lr = self.lr_schedules[i].step()
-            optimizer.lr.assign(lr)
+        for i in range(len(self.lr_schedulers)):
+            tf.keras.backend.set_value(self.optimizers[i].lr, self.lr_schedulers[i].step())
 
 
 def find_learning_rate(train_data, model, min_lr=1e-8, max_lr=0.1, n_steps=100, batch_size=128, optimizer_name=None):
@@ -94,7 +135,6 @@ def find_learning_rate(train_data, model, min_lr=1e-8, max_lr=0.1, n_steps=100, 
 
     # Batch data
     train_data = train_data.batch(batch_size).repeat()
-    n_features = tf.data.experimental.cardinality(train_data).numpy()
 
     # Create optimizer
     initial_lr = min_lr

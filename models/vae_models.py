@@ -10,6 +10,22 @@ class VAEEncoder(keras.Model):
     latent representation. Each of the hidden layers is a dense layer with a SELU activation function, and is
     regularized by a l2 penalty. The final layer is a dense layer with a linear activation function. Additionally,
     the output of the hidden layers is used to predict the class of the input data.
+
+    Args:
+        hidden_dim (list): A list of integers representing the number of nodes in each hidden layer
+        latent_dim (int): The number of nodes in the latent layer
+        activation (str): The activation function to use for the hidden layers
+        initializer (str): The initializer to use for the hidden layers
+        dropout_rate (float): The dropout rate to use for the hidden layers
+
+    Attributes:
+        hidden_dim (list): A list of integers representing the number of nodes in each hidden layer
+        latent_dim (int): The number of nodes in the latent layer
+        activation (str): The activation function to use for the hidden layers
+        initializer (str): The initializer to use for the hidden layers
+        dropout_rate (float): The dropout rate to use for the hidden layers
+        hidden_layers (list): A list of keras Dense layers representing the hidden layers of the encoder
+        latent_layer (keras Dense layer): The latent layer of the encoder
     """
     def __init__(self, hidden_dim, latent_dim, activation='relu', initializer='glorot_uniform', dropout_rate=0.2):
         super(VAEEncoder, self).__init__()
@@ -66,6 +82,22 @@ class VAEDecoder(keras.Model):
     Each of the hidden layers is a dense layer with a SELU activation function, and is regularized by a l2 penalty.
     The final layer is a dense layer with a linear activation function, and is initialized with a glorot uniform
     initializer.
+
+    Args:
+        hidden_dim (list): A list of integers representing the number of nodes in each hidden layer
+        output_dim (int): The number of nodes in the output layer
+        activation (str): The activation function to use for the hidden layers
+        initializer (str): The initializer to use for the hidden layers
+        dropout_rate (float): The dropout rate to use for the hidden layers
+
+    Attributes:
+        hidden_dim (list): A list of integers representing the number of nodes in each hidden layer
+        output_dim (int): The number of nodes in the output layer
+        activation (str): The activation function to use for the hidden layers
+        initializer (str): The initializer to use for the hidden layers
+        dropout_rate (float): The dropout rate to use for the hidden layers
+        hidden_layers (list): A list of keras Dense layers representing the hidden layers of the decoder
+        output_layer (keras Dense layer): The output layer of the decoder
     """
     def __init__(self, hidden_dim, output_dim, activation='relu', initializer='glorot_uniform', dropout_rate=0.2):
         super(VAEDecoder, self).__init__()
@@ -110,14 +142,40 @@ class VAEDecoder(keras.Model):
 
 
 def calc_kl_loss(mu, log_var):
+    """Calculates the KL divergence loss for a Variational Autoencoder
+
+    This function calculates the KL divergence loss for a Variational Autoencoder. The KL divergence loss is the
+    difference between the latent distribution and a standard normal distribution.
+
+    Args:
+        mu (tensor): The mean of the latent distribution
+        log_var (tensor): The log variance of the latent distribution
+
+    Returns: The kl divergence loss, or the difference between the latent distribution and a standard normal
+    distribution
+    """
     loss = -0.5 * (1 + log_var - tf.square(mu) - tf.exp(log_var))
     loss = tf.reduce_mean(tf.reduce_sum(loss, axis=1))
     return loss
 
 
 class VAE(keras.Model):
-    """
-    Class for creation, training, and evaluation of a Variational Autoencoder model
+    """ Variational Autoencoder Model
+
+    This class implements a Variational Autoencoder model. The model generates a latent representation of the input
+    data, and then reconstructs the input data from the latent representation. The model is trained to minimize the
+    reconstruction loss and the KL divergence between the latent distribution and a standard normal distribution.
+
+    Args:
+        encoder (VAEEncoder): The encoder model
+        decoder (VAEDecoder): The decoder model
+
+    Attributes:
+        encoder (VAEEncoder): The encoder model
+        decoder (VAEDecoder): The decoder model
+        reconstruction_loss_fn (function): The function to use to calculate the reconstruction loss
+        kl_loss_fn (function): The function to use to calculate the KL divergence loss
+        optimizer (tf.keras.optimizers.Optimizer): The optimizer to use to train the model
     """
     def __init__(
             self,

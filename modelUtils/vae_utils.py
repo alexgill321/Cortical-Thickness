@@ -2,8 +2,6 @@ import tensorflow as tf
 from models.vae_models import VAE, VAEEncoder, VAEDecoder
 from sklearn.model_selection import KFold
 import os
-import numpy as np
-from keras.callbacks import LambdaCallback
 
 
 def train_vae(data, batch_size=256, epochs=200, lr=0.0001, h_dim=None, z_dim=20, savefile=None):

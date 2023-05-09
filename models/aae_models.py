@@ -3,117 +3,131 @@ from tensorflow import keras
 
 
 class AAEEncoder(tf.keras.Model):
-    def __init__(self, input_dim, hidden_dim, latent_dim):
+    """Encoder for the Adversarial Autoencoder
+
+    Creates a custom encoder that takes in an input and outputs a latent representation of the input.
+
+    Args:
+        hidden_dim (list): List of hidden dimensions for the encoder
+        latent_dim (int): Dimensionality of the latent representation
+
+    Attributes:
+        hidden_dim (list): List of hidden dimensions for the encoder
+        latent_dim (int): Dimensionality of the latent representation
+        hidden_layers (list): List of hidden layers for the encoder
+        relu (tf.keras.layers.LeakyReLU): LeakyReLU activation function. Activation function for the hidden layers
+        latent_layer (tf.keras.layers.Dense): Dense layer for the latent representation
+    """
+    def __init__(self, hidden_dim, latent_dim):
         super(AAEEncoder, self).__init__()
-        self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
-
-        # Define the input layer
-        self.input_layer = keras.Input(shape=(self.input_dim,))
-
+        self.hidden_layers = []
+        for h_dim in self.hidden_dim:
+            self.hidden_layers.append(keras.layers.Dense(h_dim))
+        self.relu = keras.layers.LeakyReLU()
         # Define the latent representation layer
         self.latent_layer = keras.layers.Dense(self.latent_dim, activation='relu')
 
-        self.model = self.build_graph()
-
-    def build_graph(self):
-        # Connect the layers
-        inputs = self.input_layer
-        x = inputs
-        for n_neurons in self.hidden_dim:
-            x = keras.layers.Dense(n_neurons)(x)
-            x = keras.layers.LeakyReLU()(x)
+    def call(self, x, training=False, mask=None):
+        for layer in self.hidden_layers:
+            x = layer(x)
+            x = self.relu(x)
         latent = self.latent_layer(x)
-
-        # Create a Keras model for the encoder
-        return keras.Model(inputs=inputs, outputs=latent, name='encoder')
-
-    def call(self, inputs, training=False, mask=None):
-        return self.model(inputs)
+        return latent
 
     def get_config(self):
         return {
-            "input_dim": self.input_dim,
             "hidden_dim": self.hidden_dim,
             "latent_dim": self.latent_dim,
         }
 
     @classmethod
     def from_config(cls, config, custom_objects=None):
-        return cls(config["input_dim"], config["hidden_dim"], config["latent_dim"])
+        return cls(config["hidden_dim"], config["latent_dim"])
 
 
 class AAEDecoder(tf.keras.Model):
-    def __init__(self, latent_dim, input_dim, hidden_dim):
+    """Decoder for the Adversarial Autoencoder
+
+    Creates a custom decoder that takes in a latent representation and outputs a reconstructed representation of the
+    input. The decoder is symmetric to the encoder.
+
+    Args:
+        input_dim (int): Dimensionality of the input
+        hidden_dim (list): List of hidden dimensions for the decoder
+
+    Attributes:
+        input_dim (int): Dimensionality of the input
+        hidden_dim (list): List of hidden dimensions for the decoder
+        hidden_layers (list): List of hidden layers for the decoder
+        relu (tf.keras.layers.LeakyReLU): LeakyReLU activation function. Activation function for the hidden layers
+        output_layer (tf.keras.layers.Dense): Dense layer for the reconstructed representation
+    """
+    def __init__(self, input_dim, hidden_dim):
         super(AAEDecoder, self).__init__()
-        self.input_dim = input_dim
         self.hidden_dim = hidden_dim
-        self.latent_dim = latent_dim
-
-        # Define the input layer
-        self.input_layer = keras.Input(shape=(self.latent_dim,))
-
+        self.input_dim = input_dim
+        self.hidden_layers = []
+        for h_dim in self.hidden_dim:
+            self.hidden_layers.append(keras.layers.Dense(h_dim))
+        self.relu = keras.layers.LeakyReLU()
         # Define the output representation layer
         self.output_layer = keras.layers.Dense(self.input_dim, activation='linear')
 
-        self.model = self.build_graph()
-
-    def build_graph(self):
-        # Connect the layers
-        inputs = self.input_layer
-        x = inputs
-        for n_neurons in self.hidden_dim:
-            x = keras.layers.Dense(n_neurons)(x)
-            x = keras.layers.LeakyReLU()(x)
+    def call(self, x, training=False, mask=None):
+        for layer in self.hidden_layers:
+            x = layer(x)
+            x = self.relu(x)
         output = self.output_layer(x)
-
-        # Create a Keras model for the decoder
-        return keras.Model(inputs=inputs, outputs=output, name='decoder')
-
-    def call(self, inputs, training=False, mask=None):
-        return self.model(inputs)
+        return output
 
     def get_config(self):
         return {
-            "input_dim": self.input_dim,
             "hidden_dim": self.hidden_dim,
-            "latent_dim": self.latent_dim,
+            "input_dim": self.input_dim,
         }
 
     @classmethod
     def from_config(cls, config, custom_objects=None):
-        return cls(config["input_dim"], config["hidden_dim"], config["latent_dim"])
+        return cls(config["hidden_dim"], config["input_dim"])
 
 
 class AAEDiscriminator(tf.keras.Model):
+    """Discriminator for the Adversarial Autoencoder
+
+    Creates a custom discriminator that takes in a latent representation and outputs a probability of the latent
+    representation being real or fake. The discriminator is symmetric to the encoder.
+
+    Args:
+        latent_dim (int): Dimensionality of the latent representation
+        hidden_dim (list): List of hidden dimensions for the discriminator
+
+    Attributes:
+        latent_dim (int): Dimensionality of the latent representation
+        hidden_dim (list): List of hidden dimensions for the discriminator
+        hidden_layers (list): List of hidden layers for the discriminator
+        relu (tf.keras.layers.LeakyReLU): LeakyReLU activation function. Activation function for the hidden layers
+        output_layer (tf.keras.layers.Dense): Dense layer for the probability of the latent representation being real
+            or fake
+    """
     def __init__(self, latent_dim, hidden_dim):
         super(AAEDiscriminator, self).__init__()
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
-
-        # Define the input layer
-        self.input_layer = keras.Input(shape=(self.latent_dim,))
-
+        self.hidden_layers = []
+        for h_dim in self.hidden_dim:
+            self.hidden_layers.append(keras.layers.Dense(h_dim))
+        self.relu = keras.layers.LeakyReLU()
         # Define the output representation layer
         self.output_layer = keras.layers.Dense(1)
 
-        self.model = self.build_graph()
-
-    def build_graph(self):
-        # Connect the layers
-        inputs = self.input_layer
-        x = inputs
-        for n_neurons in self.hidden_dim:
-            x = keras.layers.Dense(n_neurons)(x)
-            x = keras.layers.LeakyReLU()(x)
+    def call(self, x, training=False, mask=None):
+        for layer in self.hidden_layers:
+            x = layer(x)
+            x = self.relu(x)
         output = self.output_layer(x)
-
-        # Create a Keras model for the discriminator
-        return keras.Model(inputs=inputs, outputs=output, name='discriminator')
-
-    def call(self, inputs, training=False, mask=None):
-        return self.model(inputs)
+        return output
 
     def get_config(self):
         return {
@@ -127,6 +141,17 @@ class AAEDiscriminator(tf.keras.Model):
 
 
 def discriminator_loss(real_output, fake_output):
+    """Loss function for the discriminator
+
+    Calculates the loss of the discriminator using the binary cross entropy loss function.
+
+    Args:
+        real_output (tf.Tensor): Output of the discriminator for the real input
+        fake_output (tf.Tensor): Output of the discriminator for the fake input
+
+    Returns: The loss of the discriminator, which is the sum of the binary cross entropy loss for the real and fake
+        inputs
+    """
     cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
     loss_real = cross_entropy(tf.ones_like(real_output), real_output)
     loss_fake = cross_entropy(tf.zeros_like(fake_output), fake_output)
@@ -134,11 +159,29 @@ def discriminator_loss(real_output, fake_output):
 
 
 class AAEOptimizer(tf.keras.optimizers.Optimizer):
+    """Optimizer for the Adversarial Autoencoder
+
+    Creates a custom optimizer that updates the encoder, generator, and discriminator using separate optimizers
+    which can be customized using the input parameters.
+
+    Args:
+        enc_optimizer (tf.keras.optimizers.Optimizer): Optimizer for the encoder, defaults to Adam
+        gen_optimizer (tf.keras.optimizers.Optimizer): Optimizer for the generator, defaults to Adam
+        disc_optimizer (tf.keras.optimizers.Optimizer): Optimizer for the discriminator, defaults to Adam
+        name (str): Name of the optimizer
+
+    Attributes:
+        autoencoder_optimizer (tf.keras.optimizers.Optimizer): Optimizer for the autoencoder
+        generator_optimizer (tf.keras.optimizers.Optimizer): Optimizer for the generator
+        discriminator_optimizer (tf.keras.optimizers.Optimizer): Optimizer for the discriminator
+        name (str): Name of the optimizer defaults to AAEOptimizer
+    """
     def __init__(
         self,
-        enc_optimizer=tf.keras.optimizers.Adam(),
-        gen_optimizer=tf.keras.optimizers.Adam(),
-        disc_optimizer=tf.keras.optimizers.Adam(),
+        aenc_optimizer=None,
+        gen_optimizer=None,
+        disc_optimizer=None,
+        lr=0.001,
         name='AAEOptimizer',
         **kwargs
     ):
@@ -146,34 +189,26 @@ class AAEOptimizer(tf.keras.optimizers.Optimizer):
             name=name,
             **kwargs
         )
-        self.encoder_optimizer = enc_optimizer
-        self.generator_optimizer = gen_optimizer
-        self.discriminator_optimizer = disc_optimizer
-        self.name = name
+        self.autoencoder_optimizer = aenc_optimizer or tf.keras.optimizers.Adam(learning_rate=lr)
+        self.generator_optimizer = gen_optimizer or tf.keras.optimizers.Adam(learning_rate=lr)
+        self.discriminator_optimizer = disc_optimizer or tf.keras.optimizers.Adam(learning_rate=lr)
+        self._learning_rate = lr
 
     def build(self, var_list):
-        self.encoder_optimizer.build(var_list)
-        self.generator_optimizer.build(var_list)
-        self.discriminator_optimizer.build(var_list)
-
         super().build(var_list)
 
+    def apply_gradients(self, grads_and_vars, name=None, **kwargs):
+        if name == 'autoencoder':
+            self.autoencoder_optimizer.apply_gradients(grads_and_vars, **kwargs)
+        elif name == 'generator':
+            self.generator_optimizer.apply_gradients(grads_and_vars, **kwargs)
+        elif name == 'discriminator':
+            self.discriminator_optimizer.apply_gradients(grads_and_vars, **kwargs)
+        else:
+            raise ValueError(f"Invalid optimizer name {name}")
+
     def update_step(self, gradient, variable):
-        encoder_grads_and_vars = []
-        generator_grads_and_vars = []
-        discriminator_grads_and_vars = []
-
-        for grad, var in zip(gradient, variable):
-            if 'autoencoder' in var.name:
-                encoder_grads_and_vars.append((grad, var))
-            elif 'encoder' in var.name:
-                generator_grads_and_vars.append((grad, var))
-            elif 'discriminator' in var.name:
-                discriminator_grads_and_vars.append((grad, var))
-
-        self.encoder_optimizer.apply_gradients(encoder_grads_and_vars)
-        self.generator_optimizer.apply_gradients(generator_grads_and_vars)
-        self.discriminator_optimizer.apply_gradients(discriminator_grads_and_vars)
+        pass
 
     def get_config(self):
         config = super(AAEOptimizer, self).get_config()
@@ -186,6 +221,35 @@ class AAEOptimizer(tf.keras.optimizers.Optimizer):
 
 
 class AAE(keras.Model):
+    """Adversarial Autoencoder Model
+
+    Creates a custom adversarial autoencoder model that takes in an encoder, decoder, and discriminator. The encoder
+    and decoder are symmetric to each other and the discriminator is symmetric to the encoder and decoder. The
+    adversarial autoencoder is trained by minimizing the reconstruction loss and the discriminator loss. The
+    reconstruction loss is the mean squared error between the input and the output of the autoencoder. The discriminator
+    loss is the binary cross entropy loss between the discriminator output and the true label. The discriminator is
+    trained to distinguish between the latent representation of the encoder and the latent representation of the
+    generator. The generator is trained to fool the discriminator by generating latent representations that are
+    indistinguishable from the encoder's latent representations. The autoencoder is trained to reconstruct the input
+    image.
+
+    Args:
+        encoder (tf.keras.Model): Encoder model
+        decoder (tf.keras.Model): Decoder model
+        discriminator (tf.keras.Model): Discriminator model
+        z_dim (int): Dimension of the latent representation
+
+    Attributes:
+        encoder (tf.keras.Model): Encoder model
+        decoder (tf.keras.Model): Decoder model
+        discriminator (tf.keras.Model): Discriminator model
+        z_dim (int): Dimension of the latent representation
+        accuracy (tf.keras.metrics.BinaryAccuracy): Accuracy metric for the discriminator
+        autoencoder_loss_fn (tf.keras.losses.Loss): Loss function for the autoencoder
+        discriminator_loss_fn (tf.keras.losses.Loss): Loss function for the discriminator
+        generator_loss_fn (tf.keras.losses.Loss): Loss function for the generator
+        optimizer (AAEOptimizer): Optimizer for the autoencoder, generator, and discriminator
+    """
     def __init__(
             self,
             encoder,
@@ -253,24 +317,27 @@ class AAE(keras.Model):
             gen_loss = self.generator_loss_fn(tf.ones_like(dc_fake), dc_fake)
 
         ae_vars = self.encoder.trainable_variables + self.decoder.trainable_variables
-        ae_vars.name = 'autoencoder'
         ae_grads = ae_tape.gradient(ae_loss, ae_vars)
         dc_grads = dc_tape.gradient(dc_loss, self.discriminator.trainable_variables)
         gen_grads = gen_tape.gradient(gen_loss, self.encoder.trainable_variables)
 
-        # Merge the gradients from the different tapes
-        grads_and_vars = (list(zip(ae_grads, self.encoder.trainable_variables + self.decoder.trainable_variables)) +
-                          list(zip(dc_grads, self.discriminator.trainable_variables)) +
-                          list(zip(gen_grads, self.encoder.trainable_variables)))
+        ae_grads_and_vars = zip(ae_grads, ae_vars)
+        dc_grads_and_vars = zip(dc_grads, self.discriminator.trainable_variables)
+        gen_grads_and_vars = zip(gen_grads, self.encoder.trainable_variables)
 
         # Apply the gradients using the custom optimizer
-        self.optimizer.apply_gradients(grads_and_vars)
+        self.optimizer.apply_gradients(ae_grads_and_vars, name='autoencoder')
+        self.optimizer.apply_gradients(dc_grads_and_vars, name='discriminator')
+        self.optimizer.apply_gradients(gen_grads_and_vars, name='generator')
 
         return {
             "ae_loss": ae_loss,
             "dc_loss": dc_loss,
             "dc_acc": dc_acc,
             "gen_loss": gen_loss,
+            "ae_lr": self.optimizer.autoencoder_optimizer.lr,
+            "dc_lr": self.optimizer.discriminator_optimizer.lr,
+            "gen_lr": self.optimizer.generator_optimizer.lr,
         }
 
     def eval(self, data):
