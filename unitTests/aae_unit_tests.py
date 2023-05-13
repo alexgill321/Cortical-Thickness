@@ -320,7 +320,7 @@ class TestAAELearningRateScheduler(unittest.TestCase):
         lr_and_opt = zip(schedulers, optimizers)
         scheduler = MultiOptimizerLearningRateScheduler(lr_and_opt)
         train_data = self.train_data.batch(self.batch_size)
-        history = self.aae.fit(train_data, epochs=self.epochs, callbacks=[scheduler],verbose=0)
+        history = self.aae.fit(train_data, epochs=self.epochs, callbacks=[scheduler], verbose=0)
 
         # Check if the learning rates from the logs are within the expected range
         tolerance = 1e-6

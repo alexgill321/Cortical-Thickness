@@ -1,144 +1,48 @@
 import tensorflow as tf
 from tensorflow import keras
-import sys
 
 
-class VAEEncoder(keras.Model):
-    """ Creates an encoder model for a Variational Autoencoder
+def create_vae_encoder(input_dim, hidden_dim, latent_dim, activation='relu', initializer='glorot_uniform',
+                       dropout_rate=0.2):
+    inputs = keras.layers.Input(shape=(None, input_dim))
+    x = inputs
+    for h_dim in hidden_dim:
+        x = keras.layers.Dense(
+            h_dim,
+            activation=activation,
+            kernel_initializer=initializer)(x)
+        x = keras.layers.Dropout(dropout_rate)(x)
+    mu = keras.layers.Dense(
+        latent_dim,
+        activation='linear',
+        kernel_initializer=initializer)(x)
+    log_var = keras.layers.Dense(
+        latent_dim,
+        activation='linear',
+        kernel_initializer=initializer)(x)
 
-    The encoder model is a multi-layer perceptron with a final layer that outputs the mean and log variance of the
-    latent representation. Each of the hidden layers is a dense layer with a SELU activation function, and is
-    regularized by a l2 penalty. The final layer is a dense layer with a linear activation function. Additionally,
-    the output of the hidden layers is used to predict the class of the input data.
-
-    Args:
-        hidden_dim (list): A list of integers representing the number of nodes in each hidden layer
-        latent_dim (int): The number of nodes in the latent layer
-        activation (str): The activation function to use for the hidden layers
-        initializer (str): The initializer to use for the hidden layers
-        dropout_rate (float): The dropout rate to use for the hidden layers
-
-    Attributes:
-        hidden_dim (list): A list of integers representing the number of nodes in each hidden layer
-        latent_dim (int): The number of nodes in the latent layer
-        activation (str): The activation function to use for the hidden layers
-        initializer (str): The initializer to use for the hidden layers
-        dropout_rate (float): The dropout rate to use for the hidden layers
-        hidden_layers (list): A list of keras Dense layers representing the hidden layers of the encoder
-        latent_layer (keras Dense layer): The latent layer of the encoder
-    """
-    def __init__(self, hidden_dim, latent_dim, activation='relu', initializer='glorot_uniform', dropout_rate=0.2):
-        super(VAEEncoder, self).__init__()
-        self.hidden_dim = hidden_dim
-        self.latent_dim = latent_dim
-        self.dropout_rate = dropout_rate
-        self.activation = activation
-        self.initializer = initializer
-        self.hidden_layers = []
-        for h_dim in self.hidden_dim:
-            self.hidden_layers.append(keras.layers.Dense(
-                h_dim,
-                activation=self.activation,
-                kernel_initializer=self.initializer
-            ))
-        self.latent_layer = keras.layers.Dense(
-            self.latent_dim,
-            activation='linear',
-            kernel_initializer=self.initializer)
-
-    def call(self, x, training=False, mask=None):
-        for layer in self.hidden_layers:
-            x = layer(x)
-            x = keras.layers.Dropout(self.dropout_rate)(x)
-        mu = self.latent_layer(x)
-        log_var = self.latent_layer(x)
-
-        # Sample from latent distribution
-        batch = tf.shape(mu)[0]
-        dim = tf.shape(mu)[1]
-        epsilon = tf.keras.backend.random_normal(shape=(batch, dim))
-        z = mu + tf.exp(0.5 * log_var) * epsilon
-        return mu, log_var, z
-
-    def get_config(self):
-        return {
-            "hidden_dim": self.hidden_dim,
-            "latent_dim": self.latent_dim,
-            "activation": self.activation,
-            "initializer": self.initializer,
-            "dropout_rate": self.dropout_rate
-        }
-
-    @classmethod
-    def from_config(cls, config, custom_objects=None):
-        return cls(config["hidden_dim"], config["latent_dim"], config["activation"], config["initializer"],
-                   config["dropout_rate"])
+    model = keras.Model(inputs, [mu, log_var], name='VAEEncoder')
+    return model
 
 
-class VAEDecoder(keras.Model):
-    """Creates a decoder model for a Variational Autoencoder
+def create_vae_decoder(latent_dim, hidden_dim, output_dim, activation='relu', initializer='glorot_uniform',
+                       dropout_rate=0.2):
+    # Define the input layer
+    decoder_input = keras.layers.Input(shape=(None, latent_dim), name='decoder_input')
 
-    The decoder model is a multi-layer perceptron with a final layer that outputs the mean of the input representation.
-    Each of the hidden layers is a dense layer with a SELU activation function, and is regularized by a l2 penalty.
-    The final layer is a dense layer with a linear activation function, and is initialized with a glorot uniform
-    initializer.
+    # Add the hidden layers
+    x = decoder_input
+    for h_dim in hidden_dim[1:]:
+        x = keras.layers.Dense(h_dim, activation=activation, kernel_initializer=initializer)(x)
+        x = keras.layers.Dropout(dropout_rate)(x)
 
-    Args:
-        hidden_dim (list): A list of integers representing the number of nodes in each hidden layer
-        output_dim (int): The number of nodes in the output layer
-        activation (str): The activation function to use for the hidden layers
-        initializer (str): The initializer to use for the hidden layers
-        dropout_rate (float): The dropout rate to use for the hidden layers
+    # Add the output layer
+    decoder_output = keras.layers.Dense(output_dim, activation='linear', kernel_initializer=initializer)(x)
 
-    Attributes:
-        hidden_dim (list): A list of integers representing the number of nodes in each hidden layer
-        output_dim (int): The number of nodes in the output layer
-        activation (str): The activation function to use for the hidden layers
-        initializer (str): The initializer to use for the hidden layers
-        dropout_rate (float): The dropout rate to use for the hidden layers
-        hidden_layers (list): A list of keras Dense layers representing the hidden layers of the decoder
-        output_layer (keras Dense layer): The output layer of the decoder
-    """
-    def __init__(self, hidden_dim, output_dim, activation='relu', initializer='glorot_uniform', dropout_rate=0.2):
-        super(VAEDecoder, self).__init__()
-        self.hidden_dim = hidden_dim
-        self.output_dim = output_dim
-        self.activation = activation
-        self.initializer = initializer
-        self.dropout_rate = dropout_rate
-        self.hidden_layers = []
-        for h_dim in self.hidden_dim:
-            self.hidden_layers.append(keras.layers.Dense(
-                h_dim,
-                activation=self.activation,
-                kernel_initializer=self.initializer
-            ))
-        self.output_layer = tf.keras.layers.Dense(
-            self.output_dim,
-            activation='linear',
-            kernel_initializer=self.initializer
-        )
+    # Define the model
+    decoder = keras.Model(decoder_input, decoder_output, name='VAEDecoder')
 
-    def call(self, x, training=False, mask=None):
-        for layer in self.hidden_layers:
-            x = layer(x)
-            x = keras.layers.Dropout(self.dropout_rate)(x)
-        output = self.output_layer(x)
-        return output
-
-    def get_config(self):
-        return {
-            "hidden_dim": self.hidden_dim,
-            "output_dim": self.output_dim,
-            "activation": self.activation,
-            "initializer": self.initializer,
-            "dropout_rate": self.dropout_rate
-        }
-
-    @classmethod
-    def from_config(cls, config, custom_objects=None):
-        return cls(config["hidden_dim"], config["output_dim"], config["activation"], config["initializer"],
-                   config["dropout_rate"])
+    return decoder
 
 
 def calc_kl_loss(mu, log_var):
@@ -191,13 +95,13 @@ class VAE(keras.Model):
 
     def compile(
             self,
-            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+            optimizer=None,
             reconstruction_loss_fn=tf.keras.losses.MeanSquaredError(),
             kl_loss_fn=calc_kl_loss,
             **kwargs
     ):
         super(VAE, self).compile(**kwargs)
-        self.optimizer = optimizer
+        self.optimizer = optimizer or tf.keras.optimizers.Adam(learning_rate=1e-3)
         self.reconstruction_loss_fn = reconstruction_loss_fn
         self.kl_loss_fn = kl_loss_fn
 
@@ -232,20 +136,24 @@ class VAE(keras.Model):
 
     def call(self, data, training=False, mask=None):
         x, y = data
-        z_mean, z_log_var, z = self.encoder(x, training=training)
+        z_mean, z_log_var = self.encoder(x, training=training)
+        batch = tf.shape(z_mean)[0]
+        dim = tf.shape(z_mean)[1]
+        epsilon = tf.keras.backend.random_normal(shape=(batch, dim))
+        z = z_mean + tf.exp(0.5 * z_log_var) * epsilon
         x_reconstructed = self.decoder(z, training=training)
         return z_mean, z_log_var, z, x_reconstructed
 
     def get_config(self):
         return {
-            "encoder_config": self.encoder.get_config(),
-            "decoder_config": self.decoder.get_config(),
+            "encoder": self.encoder.get_config(),
+            "decoder": self.decoder.get_config(),
         }
 
     @classmethod
     def from_config(cls, config, custom_objects=None):
-        encoder = VAEEncoder.from_config(config["encoder_config"], custom_objects=custom_objects)
-        decoder = VAEDecoder.from_config(config["decoder_config"], custom_objects=custom_objects)
+        encoder = keras.models.model_from_config(config["encoder"], custom_objects=custom_objects)
+        decoder = keras.models.model_from_config(config["decoder"], custom_objects=custom_objects)
         return cls(encoder, decoder)
 
 
