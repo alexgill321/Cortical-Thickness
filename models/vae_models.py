@@ -85,6 +85,7 @@ class VAE(keras.Model):
             self,
             encoder,
             decoder,
+            beta=1
     ):
         super(VAE, self).__init__()
         self.encoder = encoder
@@ -92,6 +93,7 @@ class VAE(keras.Model):
         self.reconstruction_loss_fn = None
         self.kl_loss_fn = None
         self.optimizer = None
+        self.beta = beta
 
     def compile(
             self,
@@ -111,7 +113,7 @@ class VAE(keras.Model):
             z_mean, z_log_var, z, x_reconstructed = self(batch_data, training=True)
             reconstruction_loss = self.reconstruction_loss_fn(x, x_reconstructed)
             kl_loss = tf.reduce_mean(self.kl_loss_fn(z_mean, z_log_var))
-            total_loss = reconstruction_loss + kl_loss
+            total_loss = reconstruction_loss + self.beta * kl_loss
         grads = tape.gradient(total_loss, self.trainable_weights)
 
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))

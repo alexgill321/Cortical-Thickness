@@ -15,7 +15,7 @@ import os
 from utils import data_validation
 from modelUtils.lr_utils import MultiOptimizerLearningRateScheduler, CyclicLR, ExponentialDecayScheduler
 from modelUtils.vae_utils import train_val_vae, create_vae, VAECrossValidator, save_vae, load_vae, \
-    get_filename_from_params
+    get_filename_from_params, create_param_grid
 import shutil
 
 
@@ -183,7 +183,7 @@ class TestVAEUtils(unittest.TestCase):
 
     def test_save_vae(self):
         self.vae.compile()
-        savefile = os.path.join(os.getcwd(), 'outputs/models/vae/test')
+        savefile = os.path.join(os.getcwd(), '../outputs/models/vae/test')
         save_vae(self.vae, savefile)
         self.assertTrue(os.path.exists(savefile + '/encoder'))
         self.assertTrue(os.path.exists(savefile + '/decoder'))
@@ -192,7 +192,7 @@ class TestVAEUtils(unittest.TestCase):
             shutil.rmtree(savefile)
 
     def test_load_vae(self):
-        savefile = os.path.join(os.getcwd(), 'outputs/models/vae/test')
+        savefile = os.path.join(os.getcwd(), '../outputs/models/vae/test')
         self.vae.compile()
         save_vae(self.vae, savefile)
         loaded_vae = load_vae(savefile)
@@ -257,8 +257,7 @@ class TestVAEUtils(unittest.TestCase):
     def test_train_val_vae_with_savefile(self):
         self.vae.compile()
         savefile = os.path.join(os.getcwd(), '../outputs/models/vae/test')
-        self.vae, hist = train_val_vae(self.vae, self.train_data, self.val_data, self.batch_size, self.epochs,
-                                       savefile=savefile)
+        self.vae, hist = train_val_vae(self.vae, self.train_data, self.val_data, self.epochs, savefile=savefile)
         self.assertIn('total_loss', hist.history)
         self.assertIn('reconstruction_loss', hist.history)
         self.assertIn('kl_loss', hist.history)
@@ -271,6 +270,84 @@ class TestVAEUtils(unittest.TestCase):
 
         if os.path.exists(savefile):
             shutil.rmtree(savefile)
+
+    def test_cross_validate_simple(self):
+        param_grid = create_param_grid([[100, 100]], [20], [0.2], ['relu'], ['glorot_uniform'])
+        self.vae.compile()
+        cv = VAECrossValidator(param_grid, self.input_dim, k_folds=5)
+        results = cv.cross_validate(self.train_data, epochs=20)
+        params = results[0][0]
+        metrics = results[0][1]
+
+        filename = get_filename_from_params(param_grid[0])
+        self.assertTrue(os.path.exists(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename)))
+        self.assertTrue(os.path.exists(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename + '/encoder')))
+        self.assertTrue(os.path.exists(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename + '/decoder')))
+
+        self.assertTrue(params['encoder']['hidden_dim'] == [100, 100])
+        self.assertTrue(params['encoder']['latent_dim'] == 20)
+        self.assertTrue(params['encoder']['dropout_rate'] == 0.2)
+        self.assertTrue(params['encoder']['activation'] == 'relu')
+        self.assertTrue(params['encoder']['initializer'] == 'glorot_uniform')
+
+        self.assertTrue(params['decoder']['hidden_dim'] == [100, 100])
+        self.assertTrue(params['decoder']['latent_dim'] == 20)
+        self.assertTrue(params['decoder']['dropout_rate'] == 0.2)
+        self.assertTrue(params['decoder']['activation'] == 'relu')
+        self.assertTrue(params['decoder']['initializer'] == 'glorot_uniform')
+
+        self.assertIn('total_loss', metrics)
+        self.assertIn('recon_loss', metrics)
+        self.assertIn('kl_loss', metrics)
+        self.assertIn('avg_training_losses', metrics)
+
+        self.assertEqual(len(metrics['avg_training_losses']), 20)
+
+        if os.path.exists(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename)):
+            shutil.rmtree(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename))
+
+    def test_cross_validate_beta(self):
+        param_grid = create_param_grid([[100, 100]], [20], [0.2], ['relu'], ['glorot_uniform'], [0.1, 0.5, 1.0])
+        self.vae.compile()
+        cv = VAECrossValidator(param_grid, self.input_dim, k_folds=5)
+        results = cv.cross_validate(self.train_data, epochs=20, verbose=0)
+        params = results[0][0]
+        metrics = results[0][1]
+
+        filename = get_filename_from_params(param_grid[0])
+        self.assertTrue(os.path.exists(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename)))
+        self.assertTrue(os.path.exists(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename + '/encoder')))
+        self.assertTrue(os.path.exists(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename + '/decoder')))
+
+        self.assertTrue(params['encoder']['hidden_dim'] == [100, 100])
+        self.assertTrue(params['encoder']['latent_dim'] == 20)
+        self.assertTrue(params['encoder']['dropout_rate'] == 0.2)
+        self.assertTrue(params['encoder']['activation'] == 'relu')
+        self.assertTrue(params['encoder']['initializer'] == 'glorot_uniform')
+
+        self.assertTrue(params['decoder']['hidden_dim'] == [100, 100])
+        self.assertTrue(params['decoder']['latent_dim'] == 20)
+        self.assertTrue(params['decoder']['dropout_rate'] == 0.2)
+        self.assertTrue(params['decoder']['activation'] == 'relu')
+        self.assertTrue(params['decoder']['initializer'] == 'glorot_uniform')
+
+        self.assertTrue(params['vae']['beta'] == 0.1)
+
+        params = results[1][0]
+        self.assertTrue(params['vae']['beta'] == 0.5)
+
+        params = results[2][0]
+        self.assertTrue(params['vae']['beta'] == 1.0)
+
+        self.assertIn('total_loss', metrics)
+        self.assertIn('recon_loss', metrics)
+        self.assertIn('kl_loss', metrics)
+        self.assertIn('avg_training_losses', metrics)
+
+        self.assertEqual(len(metrics['avg_training_losses']), 20)
+
+        if os.path.exists(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename)):
+            shutil.rmtree(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename))
 
 
 if __name__ == '__main__':
