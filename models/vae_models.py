@@ -4,7 +4,7 @@ from tensorflow import keras
 
 def create_vae_encoder(input_dim, hidden_dim, latent_dim, activation='relu', initializer='glorot_uniform',
                        dropout_rate=0.2):
-    inputs = keras.layers.Input(shape=(None, input_dim))
+    inputs = keras.layers.Input(shape=(input_dim,))
     x = inputs
     for h_dim in hidden_dim:
         x = keras.layers.Dense(
@@ -28,7 +28,7 @@ def create_vae_encoder(input_dim, hidden_dim, latent_dim, activation='relu', ini
 def create_vae_decoder(latent_dim, hidden_dim, output_dim, activation='relu', initializer='glorot_uniform',
                        dropout_rate=0.2):
     # Define the input layer
-    decoder_input = keras.layers.Input(shape=(None, latent_dim), name='decoder_input')
+    decoder_input = keras.layers.Input(shape=(latent_dim,), name='decoder_input')
 
     # Add the hidden layers
     x = decoder_input

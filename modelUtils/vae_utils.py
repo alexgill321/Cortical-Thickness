@@ -5,6 +5,7 @@ from sklearn.model_selection import KFold
 import numpy as np
 import os
 from tqdm import tqdm
+import pickle
 
 
 def save_vae(vae, savefile):
@@ -77,7 +78,8 @@ def train_val_vae(vae, train_data, val_data, early_stop=None, epochs=200, savefi
         lr_scheduler (tf.keras.callbacks.LearningRateScheduler): Learning rate scheduler.
         verbose (int): Verbosity level passed to fit.
 
-    Returns: Best model, as determined by the lowest validation loss.
+    Returns: Best trained VAE model if early stopping is enabled, otherwise the model trained for the given number of
+    epochs. Also returns the training history.
     """
     if early_stop is not None:
         stop_early = tf.keras.callbacks.EarlyStopping(monitor='val_total_loss', patience=early_stop)
@@ -97,11 +99,12 @@ def train_val_vae(vae, train_data, val_data, early_stop=None, epochs=200, savefi
     return vae, hist
 
 
-def get_filename_from_params(params):
+def get_filename_from_params(params, epochs):
     """ Create a filename from the given parameters.
 
     Args:
         params (dict): Dictionary of parameters.
+        epochs (int): Number of epochs to train for.
 
     Returns: Filename created from the given parameters.
     """
@@ -131,11 +134,12 @@ def get_filename_from_params(params):
     if enc_activation is not None:
         filename += f'act_{enc_activation}'
 
+    filename += f'_epochs_{epochs}'
     return filename
 
 
 class VAECrossValidator:
-    def __init__(self, param_grid, input_dim, k_folds, batch_size=256, save_path='../outputs/models/vae'):
+    def __init__(self, param_grid, input_dim, k_folds, save_path, batch_size=256):
         self.param_grid = param_grid
         self.save_path = save_path
         self.input_dim = input_dim
@@ -148,54 +152,62 @@ class VAECrossValidator:
         data = data.shuffle(10000).batch(self.batch_size)
 
         for params in self.param_grid:
-            filename = get_filename_from_params(params)
-            savefile = os.path.join(self.save_path, filename)
+            filename = get_filename_from_params(params, epochs)
+            save_dir = os.path.join(self.save_path, filename)
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
             val_total_losses = []
             val_recon_losses = []
             training_losses = []
             val_kl_losses = []
             kl_losses = []
+            val_total = []
+            val_recon = []
+            val_kl = []
             metrics = {}
             vae = None
-            print(f"\nTraining model with parameters {params}")
-            for i in tqdm(range(self.kf.n_splits), desc="Fold Progress", ncols=80):
+            savefile = os.path.join(save_dir, 'results.pkl')
+            if os.path.exists(savefile):
+                print(f"Loading model results from {savefile}")
+                with open(savefile, 'rb') as f:
+                    metrics = pickle.load(f)
+            else:
+                print(f"\nTraining model with parameters {params}")
+                for i in tqdm(range(self.kf.n_splits), desc="Fold Progress", ncols=80):
+                    if verbose > 0:
+                        print(f"Creating new model for parameters {params}")
+                    encoder = create_vae_encoder(input_dim=self.input_dim, **params['encoder'])
+                    decoder = create_vae_decoder(output_dim=self.input_dim, **params['decoder'])
+                    vae = VAE(encoder, decoder, **params['vae'])
+                    vae.compile()
 
-                # Load model if it exists, otherwise create a new one
-                # TODO: Save losses and load losses to add to results
-                # if os.path.exists(savefile):
-                #    if verbose > 0:
-                #        print(f"Loading model from {savefile}")
-                #    vae = load_vae(savefile)
+                    # Create train and validation datasets for this fold
+                    val_data = data.shard(self.kf.n_splits, i)
+                    train_data = data.shard(self.kf.n_splits, (i+1) % self.kf.n_splits)
 
-                # else:
-                if verbose > 0:
-                    print(f"Creating new model for parameters {params}")
-                encoder = create_vae_encoder(input_dim=self.input_dim, **params['encoder'])
-                decoder = create_vae_decoder(output_dim=self.input_dim, **params['decoder'])
-                vae = VAE(encoder, decoder, **params['vae'])
-                vae.compile()
+                    for j in range(2, self.kf.n_splits):
+                        train_data = train_data.concatenate(data.shard(self.kf.n_splits, (i+j) % self.kf.n_splits))
 
-                # Create train and validation datasets for this fold
-                val_data = data.shard(self.kf.n_splits, i)
-                train_data = data.shard(self.kf.n_splits, (i+1) % self.kf.n_splits)
-
-                for j in range(2, self.kf.n_splits):
-                    train_data = train_data.concatenate(data.shard(self.kf.n_splits, (i+j) % self.kf.n_splits))
-
-                vae, hist = train_val_vae(vae, train_data, val_data, verbose=verbose, epochs=epochs)
-                val_total_losses.append(np.min(hist.history['val_total_loss']))
-                val_recon_losses.append(np.min(hist.history['val_reconstruction_loss']))
-                val_kl_losses.append(np.min(hist.history['val_kl_loss']))
-                training_losses.append((hist.history['total_loss']))
-                kl_losses.append(hist.history['kl_loss'])
-
-            if not os.path.exists(savefile):
-                save_vae(vae, savefile)
-            metrics['total_loss'] = np.mean(val_total_losses)
-            metrics['recon_loss'] = np.mean(val_recon_losses)
-            metrics['kl_loss'] = np.mean(val_kl_losses)
-            metrics['avg_training_losses'] = np.mean(training_losses, axis=0)
-            metrics['avg_kl_losses'] = np.mean(kl_losses, axis=0)
+                    vae, hist = train_val_vae(vae, train_data, val_data, verbose=verbose, epochs=epochs)
+                    val_total_losses.append(np.min(hist.history['val_total_loss']))
+                    val_recon_losses.append(np.min(hist.history['val_reconstruction_loss']))
+                    val_kl_losses.append(np.min(hist.history['val_kl_loss']))
+                    val_total.append(hist.history['val_total_loss'])
+                    val_recon.append(hist.history['val_reconstruction_loss'])
+                    val_kl.append(hist.history['val_kl_loss'])
+                    training_losses.append((hist.history['total_loss']))
+                    kl_losses.append(hist.history['kl_loss'])
+                metrics['total_loss'] = np.mean(val_total_losses)
+                metrics['recon_loss'] = np.mean(val_recon_losses)
+                metrics['kl_loss'] = np.mean(val_kl_losses)
+                metrics['avg_val_total_losses'] = np.mean(val_total, axis=0)
+                metrics['avg_val_recon_losses'] = np.mean(val_recon, axis=0)
+                metrics['avg_val_kl_losses'] = np.mean(val_kl, axis=0)
+                metrics['avg_training_losses'] = np.mean(training_losses, axis=0)
+                metrics['avg_kl_losses'] = np.mean(kl_losses, axis=0)
+                with open(savefile, 'wb') as f:
+                    pickle.dump(metrics, f)
+                save_vae(vae, save_dir)
             results.append((params, metrics))
         return results
 
