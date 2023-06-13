@@ -250,7 +250,7 @@ for i in range(len(cv_no_kl)):
 val_batch_size = val_data.cardinality().numpy()
 val_data_batched = val_data.batch(val_batch_size)
 val_batch = next(iter(val_data_batched))
-num_clusters = val_batch_size//10
+num_clusters = 10
 kmeans = KMeans(num_clusters, n_init='auto', random_state=42)
 cluster_labels = kmeans.fit_predict(val_batch[0])
 
@@ -267,9 +267,11 @@ for i in range(num_clusters):
 top_clusters = sorted(silhouette_scores, key=lambda x: x[1], reverse=True)[:5]
 
 # Get the indices of the validation samples in each top cluster
-top_cluster_indices = {}
+top_cluster_indices = []
 for idx, _ in top_clusters:
-    top_cluster_indices[idx] = np.where(cluster_labels == idx)[0]
+    top_indexes = np.where(cluster_labels == idx)[0]
+    top_cluster_indices.append(top_indexes)
+    print(f"Cluster {idx} has {len(top_indexes)} samples")
 
 #%%
 for i in range(len(cv_res)):
@@ -277,7 +279,7 @@ for i in range(len(cv_res)):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     savefile = save_dir + '/top_5_clusters_visualization_' + labels[i] + '.png'
-    visualize_top_clusters(trained_top_models_cv_res[i], val_data, top_cluster_indices, save_dir)
+    visualize_top_clusters(trained_top_models_cv_res[i], val_data, top_cluster_indices,savefile=savefile)
 
 #%% P3 Determine how influential each of the latent dimensions are on the data reconstruction
 

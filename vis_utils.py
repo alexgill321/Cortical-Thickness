@@ -150,7 +150,7 @@ def plot_latent_dimensions_multiple(vae_models, val_data, z_dim, labels, savefil
     plt.show()
 
 
-def visualize_top_clusters(vae, val_data, top_cluster_indices, labels=None, savefile=None):
+def visualize_top_clusters(vae, val_data, top_cluster_indices, savefile=None):
     val_batch_size = val_data.cardinality().numpy()
     val_data = val_data.batch(val_batch_size)
     val_batch = next(iter(val_data))
@@ -163,19 +163,15 @@ def visualize_top_clusters(vae, val_data, top_cluster_indices, labels=None, save
     tsne = TSNE(n_components=2, random_state=42)
     z_2d = tsne.fit_transform(z)
 
-    # 3. Create color labels: '0' for non-top clusters and unique values for each top cluster
-    color_labels = ['0' if i not in sum(top_cluster_indices.values(), [])
-                    else str(list(top_cluster_indices.keys())[list(top_cluster_indices.values()).index(i)+1])
-                    for i in range(len(z))]
+    # 3. Create the labels for the clusters
+    color_labels = np.zeros(z_2d.shape[0])
+    for i in range(len(top_cluster_indices)):
+        color_labels[top_cluster_indices[i]] = i + 1
 
     # 4. Create a scatter plot
     plt.figure(figsize=(8, 6))
-    if labels is None:
-        sns.scatterplot(x=z_2d[:, 0], y=z_2d[:, 1], alpha=0.6)
-    else:
-        sns.scatterplot(x=z_2d[:, 0], y=z_2d[:, 1], hue=color_labels, alpha=0.6,
-                        palette=sns.color_palette('hsv', len(set(color_labels))))  # Color palette for different
-        # clusters
+    sns.scatterplot(x=z_2d[:, 0], y=z_2d[:, 1], hue=color_labels, alpha=0.6,
+                    palette=sns.color_palette('hsv', len(set(color_labels))))
     plt.xlabel("t-SNE 1")
     plt.ylabel("t-SNE 2")
     plt.title("t-SNE Visualization of Latent Space")
