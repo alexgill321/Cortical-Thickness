@@ -15,23 +15,26 @@ model_table_data = []
 table_data_recon = []
 model_table_data_recon = []
 #%% Load the results
-with open('outputs/CrossVal/cv_latent_15.pkl', 'rb') as file:
+with open('outputs/CrossVal/cv_finetune_latent_10.pkl', 'rb') as file:
+    cv_10 = pickle.load(file)
+
+with open('outputs/CrossVal/cv_finetune_latent_15.pkl', 'rb') as file:
     cv_15 = pickle.load(file)
 
-with open('outputs/CrossVal/cv_latent_20.pkl', 'rb') as file:
+with open('outputs/CrossVal/cv_finetune_latent_20.pkl', 'rb') as file:
     cv_20 = pickle.load(file)
 
-with open('outputs/CrossVal/cv_latent_25.pkl', 'rb') as file:
+with open('outputs/CrossVal/cv_finetune_latent_25.pkl', 'rb') as file:
     cv_25 = pickle.load(file)
 
-with open('outputs/CrossVal/cv_latent_30.pkl', 'rb') as file:
+with open('outputs/CrossVal/cv_finetune_latent_30.pkl', 'rb') as file:
     cv_30 = pickle.load(file)
 
 #%%
 best_models_total = []
 best_models_recon = []
 labels = ['15', '20', '25', '30']
-for cv_res in [cv_15, cv_20, cv_25, cv_30]:
+for cv_res in [cv_10, cv_15, cv_20, cv_25, cv_30]:
     best_model_total = None
     best_model_recon = None
     for model in cv_res:
