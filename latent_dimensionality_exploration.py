@@ -28,7 +28,8 @@ epochs = 100
 dropout = [0.1, 0.2, 0.3]
 
 param_grid = create_param_grid(hidden_dims, latent_dims, dropout, ['relu'], ['glorot_uniform'], betas=beta)
-cv = VAECrossValidator(param_grid, input_dim, 5, batch_size=128)
+save_path = os.getcwd() + '/outputs/models/vae/'
+cv = VAECrossValidator(param_grid, input_dim, 5, batch_size=128, save_path=save_path)
 
 #%%
 results = cv.cross_validate(train_data, epochs=epochs, verbose=0)

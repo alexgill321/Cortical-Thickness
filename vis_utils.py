@@ -4,6 +4,7 @@ import numpy as np
 import seaborn as sns
 from sklearn.cluster import KMeans
 import pandas as pd
+import matplotlib.patches as mpatches
 
 
 def visualize_latent_space(vae, val_data, labels=None, savefile=None):
@@ -28,10 +29,9 @@ def visualize_latent_space(vae, val_data, labels=None, savefile=None):
                         palette=sns.color_palette('hsv', len(set(labels))))
     plt.xlabel("t-SNE 1")
     plt.ylabel("t-SNE 2")
-    plt.title("t-SNE Visualization of Latent Space")
     if savefile is not None:
         plt.savefig(savefile)
-    plt.show()
+    plt.close()
 
 
 def visualize_latent_space_multiple(vae_models, val_data, labels, savefile=None):
@@ -50,12 +50,11 @@ def visualize_latent_space_multiple(vae_models, val_data, labels, savefile=None)
 
     plt.xlabel("t-SNE 1")
     plt.ylabel("t-SNE 2")
-    plt.title("t-SNE Visualization of Latent Space")
     plt.legend()
 
     if savefile is not None:
         plt.savefig(savefile)
-    plt.show()
+    plt.close()
 
 
 def latent_clustering(vae, val_data, num_clusters, savefile=None):
@@ -87,7 +86,7 @@ def latent_clustering(vae, val_data, num_clusters, savefile=None):
 
     if savefile is not None:
         plt.savefig(savefile)
-    plt.show()
+    plt.close()
     return labels
 
 
@@ -115,8 +114,7 @@ def plot_latent_dimensions(vae, val_data, z_dim, savefile=None):
     plt.tight_layout()
     if savefile is not None:
         plt.savefig(savefile)
-    plt.show()
-
+    plt.close()
 
 def plot_latent_dimensions_multiple(vae_models, val_data, z_dim, labels, savefile=None):
     val_batch_size = val_data.cardinality().numpy()
@@ -147,8 +145,7 @@ def plot_latent_dimensions_multiple(vae_models, val_data, z_dim, labels, savefil
     plt.tight_layout()
     if savefile is not None:
         plt.savefig(savefile)
-    plt.show()
-
+    plt.close()
 
 def visualize_top_clusters(vae, val_data, top_cluster_indices, savefile=None):
     val_batch_size = val_data.cardinality().numpy()
@@ -170,11 +167,22 @@ def visualize_top_clusters(vae, val_data, top_cluster_indices, savefile=None):
 
     # 4. Create a scatter plot
     plt.figure(figsize=(8, 6))
-    sns.scatterplot(x=z_2d[:, 0], y=z_2d[:, 1], hue=color_labels, alpha=0.6,
-                    palette=sns.color_palette('hsv', len(set(color_labels))))
+    color_palette = ["gray"] + sns.color_palette('hsv', len(set(color_labels)) - 1)  # use "gray" for ungrouped data
+    sns.scatterplot(x=z_2d[:, 0], y=z_2d[:, 1], hue=color_labels, alpha=0.6, palette=color_palette, legend=False)
+
+    # 5. Create legend
+    patch_list = []
+    for i in range(int(np.max(color_labels)) + 1):
+        if i == 0:
+            label = "un-clustered"
+        else:
+            label = f"cluster {i}"
+        data_key = mpatches.Patch(color=color_palette[i], label=label)
+        patch_list.append(data_key)
+    plt.legend(handles=patch_list)
+
     plt.xlabel("t-SNE 1")
     plt.ylabel("t-SNE 2")
-    plt.title("t-SNE Visualization of Latent Space")
     if savefile is not None:
         plt.savefig(savefile)
-    plt.show()
+    plt.close()
