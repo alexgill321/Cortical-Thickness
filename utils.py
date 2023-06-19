@@ -68,4 +68,12 @@ def data_validation(filepath, validation_split=0.2):
     test = tf.data.Dataset.from_tensor_slices((test_x, test_y))
     val = tf.data.Dataset.from_tensor_slices((val_x, val_y))
     return train, val, test
+
+
+def generate_feature_names(filepath):
+    db = pd.read_csv(filepath)
+    db = db.drop(['age', 'sex', 'scanner', 'euler', 'BrainSegVolNotVent', 'euler_med', 'sample', 'dcode',
+                  'timepoint'], axis=1, inplace=False)
+    return db.columns
+
 #%%

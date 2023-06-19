@@ -2,9 +2,11 @@ import pickle as pkl
 import os
 from modelUtils.vae_utils import load_vae, get_filename_from_params
 from models.vae_models import VAE, create_vae_encoder, create_vae_decoder
-from utils import data_validation
+from utils import data_validation, generate_feature_names
 from vis_utils import visualize_latent_space_multiple, plot_latent_dimensions_multiple, visualize_latent_space, \
-    plot_latent_dimensions, latent_clustering, visualize_top_clusters
+    plot_latent_dimensions, latent_clustering, visualize_top_clusters, visualize_latent_influence, \
+    visualize_latent_interpolation
+
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_samples
 from modelUtils.vae_utils import save_vae
@@ -17,6 +19,7 @@ cv_res = []
 
 #%% Load data
 filepath = os.path.join(cur, 'outputs/megasample_cleaned.csv')
+feat_labels = generate_feature_names(filepath)
 train_data, val_data, test_data = data_validation(filepath, validation_split=0.2)
 input_dim = train_data.element_spec[0].shape[0]
 
@@ -221,17 +224,19 @@ if P1:
             os.makedirs(save_dir)
 
         savefile = save_dir + '/latent_space_visualization_' + labels[i] + '.png'
-        visualize_latent_space_multiple(trained_top_5_cv_res[i], val_data, labels=['vae1', 'vae2', 'vae3', 'vae4', 'vae5'],
-                                        savefile=savefile)
+        visualize_latent_space_multiple(trained_top_5_cv_res[i], val_data,
+                                        labels=['vae1', 'vae2', 'vae3', 'vae4', 'vae5'], savefile=savefile)
         savefile = save_dir + '/latent_dim_visualization_' + labels[i] + '.png'
-        plot_latent_dimensions_multiple(trained_top_5_cv_res[i], val_data, labels=['vae1', 'vae2', 'vae3', 'vae4', 'vae5'],
-                                        z_dim=int(labels[i]), savefile=savefile)
-        savefile = save_dir + '/og_latent_space_visualization_' + labels[i] + '.png'
-        visualize_latent_space_multiple(trained_top_5_cv_og[i], val_data, labels=['vae1', 'vae2', 'vae3', 'vae4', 'vae5'],
+        plot_latent_dimensions_multiple(trained_top_5_cv_res[i], val_data,
+                                        labels=['vae1', 'vae2', 'vae3', 'vae4', 'vae5'], z_dim=int(labels[i]),
                                         savefile=savefile)
+        savefile = save_dir + '/og_latent_space_visualization_' + labels[i] + '.png'
+        visualize_latent_space_multiple(trained_top_5_cv_og[i], val_data,
+                                        labels=['vae1', 'vae2', 'vae3', 'vae4', 'vae5'], savefile=savefile)
         savefile = save_dir + '/og_latent_dim_visualization_' + labels[i] + '.png'
-        plot_latent_dimensions_multiple(trained_top_5_cv_og[i], val_data, labels=['vae1', 'vae2', 'vae3', 'vae4', 'vae5'],
-                                        z_dim=int(labels[i]), savefile=savefile)
+        plot_latent_dimensions_multiple(trained_top_5_cv_og[i], val_data,
+                                        labels=['vae1', 'vae2', 'vae3', 'vae4', 'vae5'], z_dim=int(labels[i]),
+                                        savefile=savefile)
 
 #%%
 if P1:
@@ -340,6 +345,31 @@ if P2:
         plt.close()
 
 #%% P3 Determine how influential each of the latent dimensions are on the data reconstruction
+if P3:
+    for i in range(len(cv_res)):
+        save_dir = cur + '/outputs/Images/latent_space/P3'
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        # File paths for the images
+        savefile_1 = save_dir + '/latent_entanglement_' + labels[i] + '.png'
+        savefile_2 = save_dir + '/no_kl_latent_entanglement_' + labels[i] + '.png'
+        savefile_3 = save_dir + '/og_latent_entanglement_' + labels[i] + '.png'
+
+        visualize_latent_interpolation(trained_top_models_cv_res[i], val_data, feat_labels=feat_labels,
+                                       z_dim=int(labels[i]), savefile=savefile_1)
+        visualize_latent_interpolation(trained_top_models_cv_no_kl[i], val_data, feat_labels=feat_labels,
+                                       z_dim=int(labels[i]), savefile=savefile_2)
+        visualize_latent_interpolation(trained_top_models_cv_og[i], val_data, feat_labels=feat_labels,
+                                       z_dim=int(labels[i]), savefile=savefile_3)
+
+        savefile_1 = save_dir + '/latent_dim_influence_' + labels[i] + '.png'
+        savefile_2 = save_dir + '/no_kl_latent_dim_influence_' + labels[i] + '.png'
+        savefile_3 = save_dir + '/og_latent_dim_influence_' + labels[i] + '.png'
+
+        visualize_latent_influence(trained_top_models_cv_res[i], val_data, z_dim=int(labels[i]), savefile=savefile_1)
+        visualize_latent_influence(trained_top_models_cv_no_kl[i], val_data, z_dim=int(labels[i]), savefile=savefile_2)
+        visualize_latent_influence(trained_top_models_cv_og[i], val_data, z_dim=int(labels[i]), savefile=savefile_3)
+
 
 #%% P4 Determine how accurate the data reconstructions are
 
