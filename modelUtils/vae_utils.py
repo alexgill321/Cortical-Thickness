@@ -1,3 +1,4 @@
+import pandas as pd
 import tensorflow as tf
 from models.vae_models import VAE, create_vae_decoder, create_vae_encoder
 from sklearn.model_selection import ParameterGrid
@@ -195,6 +196,7 @@ class VAECrossValidator:
             val_total = []
             val_recon = []
             val_kl = []
+            r2 = []
             metrics = {}
             vae = None
             savefile = os.path.join(save_dir, 'results.pkl')
@@ -223,14 +225,17 @@ class VAECrossValidator:
                     val_total_losses.append(np.min(hist.history['val_total_loss']))
                     val_recon_losses.append(np.min(hist.history['val_reconstruction_loss']))
                     val_kl_losses.append(np.min(hist.history['val_kl_loss']))
+                    r2.append(np.max(hist.history['val_r2']))
                     val_total.append(hist.history['val_total_loss'])
                     val_recon.append(hist.history['val_reconstruction_loss'])
                     val_kl.append(hist.history['val_kl_loss'])
                     training_losses.append((hist.history['total_loss']))
                     kl_losses.append(hist.history['kl_loss'])
-                metrics['total_loss'] = np.mean(val_total_losses)
-                metrics['recon_loss'] = np.mean(val_recon_losses)
-                metrics['kl_loss'] = np.mean(val_kl_losses)
+
+                metrics['Total Loss'] = np.mean(val_total_losses)
+                metrics['Reconstruction Loss'] = np.mean(val_recon_losses)
+                metrics['KL Loss'] = np.mean(val_kl_losses)
+                metrics['R2'] = np.mean(r2)
                 metrics['avg_val_total_losses'] = np.mean(val_total, axis=0)
                 metrics['avg_val_recon_losses'] = np.mean(val_recon, axis=0)
                 metrics['avg_val_kl_losses'] = np.mean(val_kl, axis=0)

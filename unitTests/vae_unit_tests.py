@@ -12,7 +12,7 @@ import numpy as np
 import tensorflow as tf
 from models.vae_models import VAE, calc_kl_loss, create_vae_encoder, create_vae_decoder
 import os
-from utils import data_validation
+from utils import generate_data_thickness_only
 from modelUtils.lr_utils import MultiOptimizerLearningRateScheduler, CyclicLR, ExponentialDecayScheduler
 from modelUtils.vae_utils import train_val_vae, create_vae, VAECrossValidator, save_vae, load_vae, \
     get_filename_from_params, create_param_grid
@@ -23,7 +23,7 @@ class TestVAEModel(unittest.TestCase):
     def setUp(self):
         cur = os.getcwd()
         filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-        self.train_data, self.val_data, self.test_data = data_validation(filepath)
+        self.train_data, self.val_data, self.test_data = generate_data_thickness_only(filepath)
         self.h_dim = [100, 100]
         self.z_dim = 20
         self.input_dim = self.train_data.element_spec[0].shape[0]
@@ -165,7 +165,7 @@ class TestVAELearningRateScheduler(unittest.TestCase):
     def setUp(self):
         cur = os.getcwd()
         filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-        self.train_data, self.val_data, self.test_data = data_validation(filepath)
+        self.train_data, self.val_data, self.test_data = generate_data_thickness_only(filepath)
         self.input_dim = self.train_data.element_spec[0].shape[0]
         self.batch_size = 128
         self.epochs = 10
@@ -214,7 +214,7 @@ class TestVAEUtils(unittest.TestCase):
     def setUp(self):
         cur = os.getcwd()
         filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-        self.train_data, self.val_data, self.test_data = data_validation(filepath)
+        self.train_data, self.val_data, self.test_data = generate_data_thickness_only(filepath)
         self.input_dim = self.train_data.element_spec[0].shape[0]
         self.batch_size = 128
         self.epochs = 10
@@ -266,7 +266,10 @@ class TestVAEUtils(unittest.TestCase):
 
     def test_train_val_vae(self):
         self.vae.compile()
-        self.vae, hist = train_val_vae(self.vae, self.train_data, self.val_data, self.batch_size, self.epochs)
+        train_batched = self.train_data.batch(self.batch_size)
+        val_batch_size = self.val_data.cardinality().numpy()
+        val_batched = self.val_data.batch(val_batch_size)
+        self.vae, hist = train_val_vae(self.vae, train_batched, val_batched, epochs=self.epochs)
         self.assertIn('total_loss', hist.history)
         self.assertIn('reconstruction_loss', hist.history)
         self.assertIn('kl_loss', hist.history)
@@ -302,7 +305,10 @@ class TestVAEUtils(unittest.TestCase):
     def test_train_val_vae_with_savefile(self):
         self.vae.compile()
         savefile = os.path.join(os.getcwd(), '../outputs/models/vae/test')
-        self.vae, hist = train_val_vae(self.vae, self.train_data, self.val_data, self.epochs, savefile=savefile)
+        train_batched = self.train_data.batch(self.batch_size)
+        val_batch_size = self.val_data.cardinality().numpy()
+        val_batched = self.val_data.batch(val_batch_size)
+        self.vae, hist = train_val_vae(self.vae, train_batched, val_batched, epochs=self.epochs, savefile=savefile)
         self.assertIn('total_loss', hist.history)
         self.assertIn('reconstruction_loss', hist.history)
         self.assertIn('kl_loss', hist.history)
@@ -317,13 +323,12 @@ class TestVAEUtils(unittest.TestCase):
             shutil.rmtree(savefile)
 
     def test_cross_validate_simple(self):
-        param_grid = create_param_grid([[100, 100]], [20], [0.2], ['relu'], ['glorot_uniform'])
+        param_grid = create_param_grid([[100, 100]], [20], [0.2], ['relu'], ['glorot_uniform'], betas=[.001])
         self.vae.compile()
         save_path = os.path.join(os.getcwd(), '../outputs/models/vae/')
         cv = VAECrossValidator(param_grid, self.input_dim, k_folds=5, save_path=save_path)
         results = cv.cross_validate(self.train_data, epochs=10)
-        params = results[0][0]
-        metrics = results[0][1]
+        (params, metrics) = results[0]
 
         filename = get_filename_from_params(param_grid[0], epochs=10)
         self.assertTrue(os.path.exists(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename)))
@@ -342,12 +347,16 @@ class TestVAEUtils(unittest.TestCase):
         self.assertTrue(params['decoder']['activation'] == 'relu')
         self.assertTrue(params['decoder']['initializer'] == 'glorot_uniform')
 
-        self.assertIn('total_loss', metrics)
-        self.assertIn('recon_loss', metrics)
-        self.assertIn('kl_loss', metrics)
+        self.assertIn('Total Loss', metrics)
+        self.assertIn('Reconstruction Loss', metrics)
+        self.assertIn('KL Loss', metrics)
+        self.assertIn('avg_val_total_losses', metrics)
+        self.assertIn('avg_val_recon_losses', metrics)
+        self.assertIn('avg_val_kl_losses', metrics)
         self.assertIn('avg_training_losses', metrics)
+        self.assertIn('R2', metrics)
 
-        self.assertEqual(len(metrics['avg_training_losses']), 10)
+        self.assertEqual(len(metrics['avg_val_total_losses']), 10)
 
         if os.path.exists(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename)):
             shutil.rmtree(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename))
