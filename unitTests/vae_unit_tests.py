@@ -22,7 +22,7 @@ import shutil
 class TestVAEModel(unittest.TestCase):
     def setUp(self):
         cur = os.getcwd()
-        filepath = os.path.join(cur, '../outputs/megasample_cleaned.csv')
+        filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
         self.train_data, self.val_data, self.test_data = data_validation(filepath)
         self.h_dim = [100, 100]
         self.z_dim = 20
@@ -44,6 +44,51 @@ class TestVAEModel(unittest.TestCase):
         z = tf.random.normal(shape=(self.batch_size, self.z_dim))
         x = self.decoder(z)
         self.assertEqual(x.shape, (self.batch_size, self.input_dim))
+
+    def test_encoder_layer_shapes_simple(self):
+        x = tf.random.normal(shape=(self.batch_size, self.input_dim))
+        z_mean, z_log_var = self.encoder(x)
+        layers = self.encoder.layers
+        self.assertEqual(len(layers), len(self.h_dim)*2 + 3)
+        self.assertEqual(self.encoder.layers[0].input_shape[0], (None, self.input_dim))
+        self.assertEqual(self.encoder.layers[-1].output_shape, (None, self.z_dim))
+        for i in range(len(self.h_dim)):
+            self.assertEqual(self.encoder.layers[i*2+1].output_shape, (None, self.h_dim[i]))
+
+    def test_decoder_layer_shapes_simple(self):
+        z = tf.random.normal(shape=(self.batch_size, self.z_dim))
+        x = self.decoder(z)
+        layers = self.decoder.layers
+        self.assertEqual(len(layers), len(self.h_dim)*2 + 2)
+        self.assertEqual(self.decoder.layers[0].input_shape[0], (None, self.z_dim))
+        self.assertEqual(self.decoder.layers[-1].output_shape, (None, self.input_dim))
+        for i in range(len(self.h_dim)):
+            self.assertEqual(self.decoder.layers[i*2+1].output_shape, (None, self.h_dim[i]))
+
+    def test_encoder_layer_shapes_complex(self):
+        self.h_dim = [300, 200, 100]
+        self.encoder = create_vae_encoder(self.input_dim, self.h_dim, self.z_dim)
+        x = tf.random.normal(shape=(self.batch_size, self.input_dim))
+        z_mean, z_log_var = self.encoder(x)
+        layers = self.encoder.layers
+        self.assertEqual(len(layers), len(self.h_dim)*2 + 3)
+        self.assertEqual(self.encoder.layers[0].input_shape[0], (None, self.input_dim))
+        self.assertEqual(self.encoder.layers[-1].output_shape, (None, self.z_dim))
+        for i in range(len(self.h_dim)):
+            self.assertEqual(self.encoder.layers[i*2+1].output_shape, (None, self.h_dim[i]))
+
+    def test_decoder_layer_shapes_complex(self):
+        self.h_dim = [300, 200, 100]
+        self.decoder = create_vae_decoder(self.z_dim, self.h_dim, self.input_dim)
+        z = tf.random.normal(shape=(self.batch_size, self.z_dim))
+        x = self.decoder(z)
+        layers = self.decoder.layers
+        self.assertEqual(len(layers), len(self.h_dim)*2 + 2)
+        self.assertEqual(self.decoder.layers[0].input_shape[0], (None, self.z_dim))
+        self.assertEqual(self.decoder.layers[-1].output_shape, (None, self.input_dim))
+        self.h_dim = self.h_dim[::-1]
+        for i in range(len(self.h_dim)):
+            self.assertEqual(self.decoder.layers[i*2+1].output_shape, (None, self.h_dim[i]))
 
     def test_vae_output_shape(self):
         train_data = self.train_data.batch(self.batch_size)
@@ -119,7 +164,7 @@ class TestVAEModel(unittest.TestCase):
 class TestVAELearningRateScheduler(unittest.TestCase):
     def setUp(self):
         cur = os.getcwd()
-        filepath = os.path.join(cur, '../outputs/megasample_cleaned.csv')
+        filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
         self.train_data, self.val_data, self.test_data = data_validation(filepath)
         self.input_dim = self.train_data.element_spec[0].shape[0]
         self.batch_size = 128
@@ -168,7 +213,7 @@ class TestVAELearningRateScheduler(unittest.TestCase):
 class TestVAEUtils(unittest.TestCase):
     def setUp(self):
         cur = os.getcwd()
-        filepath = os.path.join(cur, '../outputs/megasample_cleaned.csv')
+        filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
         self.train_data, self.val_data, self.test_data = data_validation(filepath)
         self.input_dim = self.train_data.element_spec[0].shape[0]
         self.batch_size = 128
@@ -274,12 +319,13 @@ class TestVAEUtils(unittest.TestCase):
     def test_cross_validate_simple(self):
         param_grid = create_param_grid([[100, 100]], [20], [0.2], ['relu'], ['glorot_uniform'])
         self.vae.compile()
-        cv = VAECrossValidator(param_grid, self.input_dim, k_folds=5)
-        results = cv.cross_validate(self.train_data, epochs=20)
+        save_path = os.path.join(os.getcwd(), '../outputs/models/vae/')
+        cv = VAECrossValidator(param_grid, self.input_dim, k_folds=5, save_path=save_path)
+        results = cv.cross_validate(self.train_data, epochs=10)
         params = results[0][0]
         metrics = results[0][1]
 
-        filename = get_filename_from_params(param_grid[0])
+        filename = get_filename_from_params(param_grid[0], epochs=10)
         self.assertTrue(os.path.exists(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename)))
         self.assertTrue(os.path.exists(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename + '/encoder')))
         self.assertTrue(os.path.exists(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename + '/decoder')))
@@ -301,7 +347,7 @@ class TestVAEUtils(unittest.TestCase):
         self.assertIn('kl_loss', metrics)
         self.assertIn('avg_training_losses', metrics)
 
-        self.assertEqual(len(metrics['avg_training_losses']), 20)
+        self.assertEqual(len(metrics['avg_training_losses']), 10)
 
         if os.path.exists(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename)):
             shutil.rmtree(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename))

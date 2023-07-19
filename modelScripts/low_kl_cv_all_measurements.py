@@ -35,7 +35,7 @@ cv = VAECrossValidator(param_grid, input_dim, 5, batch_size=128, save_path=save_
 results = cv.cross_validate(train_data, epochs=epochs, verbose=0)
 
 #%%
-with open('outputs/CrossVal/cv_latent_10.pkl', 'wb') as file:
+with open('../outputs/CrossVal/cv_latent_10.pkl', 'wb') as file:
     pickle.dump(results, file)
 
 #%%
@@ -55,7 +55,7 @@ cv = VAECrossValidator(param_grid, input_dim, 5, batch_size=128)
 results = cv.cross_validate(train_data, epochs=epochs, verbose=0)
 
 #%%
-with open('outputs/CrossVal/cv_latent_15.pkl', 'wb') as file:
+with open('../outputs/CrossVal/cv_latent_15.pkl', 'wb') as file:
     pickle.dump(results, file)
 
 #%%
@@ -75,7 +75,7 @@ cv = VAECrossValidator(param_grid, input_dim, 5, batch_size=128)
 results = cv.cross_validate(train_data, epochs=epochs, verbose=0)
 
 #%%
-with open('outputs/CrossVal/cv_latent_20.pkl', 'wb') as file:
+with open('../outputs/CrossVal/cv_latent_20.pkl', 'wb') as file:
     pickle.dump(results, file)
 
 #%%
@@ -95,7 +95,7 @@ cv = VAECrossValidator(param_grid, input_dim, 5, batch_size=128)
 results = cv.cross_validate(train_data, epochs=epochs, verbose=0)
 
 #%%
-with open('outputs/CrossVal/cv_latent_25.pkl', 'wb') as file:
+with open('../outputs/CrossVal/cv_latent_25.pkl', 'wb') as file:
     pickle.dump(results, file)
 
 #%%
@@ -115,23 +115,8 @@ cv = VAECrossValidator(param_grid, input_dim, 5, batch_size=128)
 results = cv.cross_validate(train_data, epochs=epochs, verbose=0)
 
 #%%
-with open('outputs/CrossVal/cv_latent_30.pkl', 'wb') as file:
+with open('../outputs/CrossVal/cv_latent_30.pkl', 'wb') as file:
     pickle.dump(results, file)
 
-#%%
-# Plotting results
 
-#%%
-with open('outputs/CrossVal/cv_latent_5.pkl', 'rb') as file:
-    cv_5 = pickle.load(file)
-
-#%%
-with open('outputs/CrossVal/cv_latent_10.pkl', 'rb') as file:
-    cv_10 = pickle.load(file)
-
-#%%
-with open('outputs/CrossVal/cv_latent_15.pkl', 'rb') as file:
-    cv_15 = pickle.load(file)
-
-#%%
 

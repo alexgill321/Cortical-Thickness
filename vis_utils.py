@@ -5,15 +5,14 @@ import seaborn as sns
 from sklearn.cluster import KMeans
 import pandas as pd
 import matplotlib.patches as mpatches
+import tensorflow as tf
+from scipy import stats
 
 
-def visualize_latent_space(vae, val_data, labels=None, savefile=None):
-    val_batch_size = val_data.cardinality().numpy()
-    val_data = val_data.batch(val_batch_size)
-    val_batch = next(iter(val_data))
+def visualize_latent_space(vae, data, labels=None, savefile=None):
 
     # 1. Encode input samples
-    z_mean, z_log_var, z, _ = vae(val_batch)
+    z_mean, z_log_var, z, _ = vae(data)
     z = z.numpy()
 
     # 2. Apply t-SNE
@@ -21,7 +20,7 @@ def visualize_latent_space(vae, val_data, labels=None, savefile=None):
     z_2d = tsne.fit_transform(z)
 
     # 3. Create a scatter plot
-    plt.figure(figsize=(8, 6))
+    fig = plt.figure(figsize=(8, 6))
     if labels is None:
         sns.scatterplot(x=z_2d[:, 0], y=z_2d[:, 1], alpha=0.6)
     else:
@@ -34,15 +33,13 @@ def visualize_latent_space(vae, val_data, labels=None, savefile=None):
     plt.close()
 
 
-def visualize_latent_space_multiple(vae_models, val_data, labels, savefile=None):
-    val_batch_size = val_data.cardinality().numpy()
-    val_data = val_data.batch(val_batch_size)
-    val_batch = next(iter(val_data))
+def visualize_latent_space_multiple(vae_models, data, labels, savefile=None):
 
     z_results = []
+    fig = plt.figure(figsize=(8, 6))
     for i in range(len(vae_models)):
         model = vae_models[i]
-        z_mean, z_log_var, z, _ = model(val_batch)
+        z_mean, z_log_var, z, _ = model(data)
         z = z.numpy()
         tsne = TSNE(n_components=2, random_state=42)
         z_2d = tsne.fit_transform(z)
@@ -57,14 +54,11 @@ def visualize_latent_space_multiple(vae_models, val_data, labels, savefile=None)
     plt.close()
 
 
-def latent_clustering(vae, val_data, num_clusters, savefile=None):
+def latent_clustering(vae, data, num_clusters, savefile=None):
     # Assuming X is your high dimensional data.
-    val_batch_size = val_data.cardinality().numpy()
-    val_data = val_data.batch(val_batch_size)
-    val_batch = next(iter(val_data))
 
     # 1. Encode input samples
-    z_mean, z_log_var, z, _ = vae(val_batch)
+    z_mean, z_log_var, z, _ = vae(data)
     z = z.numpy()
 
     # Apply KMeans clustering
@@ -81,7 +75,7 @@ def latent_clustering(vae, val_data, num_clusters, savefile=None):
     df['Cluster'] = labels
 
     # Plot the results using Seaborn
-    plt.figure(figsize=(8, 6))
+    fig = plt.figure(figsize=(8, 6))
     sns.scatterplot(data=df, x='Component 1', y='Component 2', hue='Cluster',
                     palette=sns.color_palette('hsv', num_clusters))
 
@@ -91,10 +85,7 @@ def latent_clustering(vae, val_data, num_clusters, savefile=None):
     return labels
 
 
-def plot_latent_dimensions(vae, val_data, z_dim, savefile=None):
-    val_batch_size = val_data.cardinality().numpy()
-    val_data = val_data.batch(val_batch_size)
-    val_batch = next(iter(val_data))
+def plot_latent_dimensions(vae, data, z_dim, savefile=None):
 
     n_cols = 3
     n_rows = int(np.ceil(z_dim / n_cols))
@@ -102,7 +93,7 @@ def plot_latent_dimensions(vae, val_data, z_dim, savefile=None):
     fig, axs = plt.subplots(n_rows, n_cols, figsize=(15, 15))
     axs = axs.flatten()
 
-    z_mean, z_log_var, z, _ = vae(val_batch)
+    z_mean, z_log_var, z, _ = vae(data)
     z = z.numpy()
 
     for i in range(z_dim):
@@ -118,10 +109,7 @@ def plot_latent_dimensions(vae, val_data, z_dim, savefile=None):
     plt.close()
 
 
-def plot_latent_dimensions_multiple(vae_models, val_data, z_dim, labels, savefile=None):
-    val_batch_size = val_data.cardinality().numpy()
-    val_data = val_data.batch(val_batch_size)
-    val_batch = next(iter(val_data))
+def plot_latent_dimensions_multiple(vae_models, data, z_dim, labels, savefile=None):
 
     n_cols = 3
     n_rows = int(np.ceil(z_dim / n_cols))
@@ -132,7 +120,7 @@ def plot_latent_dimensions_multiple(vae_models, val_data, z_dim, labels, savefil
     # Store the latent vectors for each model
     zs = []
     for vae in vae_models:
-        z_mean, z_log_var, z, _ = vae(val_batch)
+        z_mean, z_log_var, z, _ = vae(data)
         zs.append(z.numpy())
 
     for i in range(z_dim):
@@ -150,13 +138,10 @@ def plot_latent_dimensions_multiple(vae_models, val_data, z_dim, labels, savefil
     plt.close()
 
 
-def visualize_top_clusters(vae, val_data, top_cluster_indices, savefile=None):
-    val_batch_size = val_data.cardinality().numpy()
-    val_data = val_data.batch(val_batch_size)
-    val_batch = next(iter(val_data))
+def visualize_top_clusters(vae, data, top_cluster_indices, savefile=None):
 
     # 1. Encode input samples
-    z_mean, z_log_var, z, _ = vae(val_batch)
+    z_mean, z_log_var, z, _ = vae(data)
     z = z.numpy()
 
     # 2. Apply t-SNE
@@ -191,13 +176,10 @@ def visualize_top_clusters(vae, val_data, top_cluster_indices, savefile=None):
     plt.close()
 
 
-def visualize_latent_influence(vae, val_data, z_dim, savefile=None):
-    val_batch_size = val_data.cardinality().numpy()
-    val_data = val_data.batch(val_batch_size)
-    val_batch = next(iter(val_data))
+def visualize_latent_influence(vae, data, z_dim, savefile=None):
 
     # 1. Encode input samples
-    z_mean, z_log_var, z, original_recon = vae(val_batch)
+    z_mean, z_log_var, z, original_recon = vae(data)
     z = z.numpy()
 
     # Prepare to collect mean errors for each dimension
@@ -237,13 +219,10 @@ def visualize_latent_influence(vae, val_data, z_dim, savefile=None):
     plt.close()
 
 
-def visualize_latent_interpolation(vae, val_data, z_dim, feat_labels, num_features=10, savefile=None):
-    val_batch_size = val_data.cardinality().numpy()
-    val_data = val_data.batch(val_batch_size)
-    val_batch = next(iter(val_data))
+def visualize_latent_interpolation(vae, data, z_dim, feat_labels, num_features=10, savefile=None):
 
     # 1. Encode input samples
-    z_mean, z_log_var, z, original_recon = vae(val_batch)
+    z_mean, z_log_var, z, original_recon = vae(data)
     z = z.numpy()
 
     # Determine the features to visualize
@@ -293,5 +272,87 @@ def visualize_latent_interpolation(vae, val_data, z_dim, feat_labels, num_featur
         plt.savefig(savefile)
 
     plt.close()
+
+
+def visualize_errors_hist(vae, data, savefile=None):
+    """ Creates a Histogram of the mean reconstruction errors. """
+
+    x, y = data
+    x = tf.cast(x, dtype=tf.float32)
+    # Generate the reconstruction
+    z_mean, z_log_var, z, x_reconstruction = vae(data)
+
+    # Calculate the error
+    error = x - x_reconstruction
+
+    # Calculate the mean error for each sample
+    mean_errors = np.mean(error, axis=1)
+
+    # Create a histogram of the mean errors
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.hist(mean_errors, bins=50, density=True, alpha=0.6, color='g')
+
+    # Fit a normal distribution to the data
+    mu, std = stats.norm.fit(mean_errors)
+
+    # Plot the PDF.
+    xmin, xmax = plt.xlim()
+    x = np.linspace(xmin, xmax, 100)
+    p = stats.norm.pdf(x, mu, std)
+    ax.plot(x, p, 'k', linewidth=2)
+    title = "Fit results: mu = %.2f,  std = %.2f" % (mu, std)
+    ax.set_title(title)
+
+    t_stat, p_val = stats.ttest_1samp(mean_errors, 0)
+    if p_val < 0.05:
+        ax.axvline(x=0, color='r', linestyle='--', label=f'p-value: {p_val:.2f}')
+    else:
+        ax.axvline(x=0, color='g', linestyle='--', label=f'p-value: {p_val:.2f}')
+
+    ax.legend()
+    ax.set_xlabel('Mean Error')
+    ax.set_ylabel('Density')
+
+    if savefile:
+        plt.savefig(savefile)
+
+    plt.show()
+    plt.close()
+
+
+def calc_feature_errors(vae, data, feat_labels, savefile=None):
+    """ Calculates the mean reconstruction error for each feature.
+
+     Args:
+        vae: The trained VAE model.
+        data: The data to be used for the calculation.
+        feat_labels: The labels for the features.
+        savefile: The path to save the results to.
+
+     Returns: A dataframe containing the mean reconstruction error for each feature.
+     """
+    x, y = data
+    x = tf.cast(x, dtype=tf.float32)
+
+    # Generate the reconstruction
+    z_mean, z_log_var, z, x_reconstruction = vae(data)
+
+    # Calculate the error
+    error = x - x_reconstruction
+
+    # Calculate the mean error for each of the features
+    mean_errors = np.mean(error, axis=0)
+
+    # Create a dataframe to store the results
+    df = pd.DataFrame({'feature': feat_labels, 'mean_error': mean_errors})
+
+    # Sort the dataframe by mean error
+    df = df.sort_values(by='mean_error', ascending=False)
+
+    if savefile:
+        df.to_csv(savefile, index=False)
+
+    return df
+
 
 #%%

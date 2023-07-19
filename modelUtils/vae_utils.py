@@ -43,7 +43,7 @@ def load_vae(savefile):
     return vae
 
 
-def create_vae(n_features, h_dim, z_dim):
+def create_vae(n_features, h_dim, z_dim, beta=1.0):
     """ Creates a VAE model with the given parameters.
 
     Creates an un-compiled VAE model with the given parameters. The model must be compiled with the desired
@@ -53,12 +53,13 @@ def create_vae(n_features, h_dim, z_dim):
         n_features (int): Number of features in the input data.
         h_dim (list): List of hidden layer dimensions.
         z_dim (int): Dimension of latent space.
+        beta (float): Beta parameter for the KL divergence loss.
 
     Returns: Un-compiled VAE model with the given parameters.
     """
     encoder = create_vae_encoder(n_features, h_dim, z_dim)
     decoder = create_vae_decoder(z_dim, h_dim, n_features)
-    vae = VAE(encoder, decoder)
+    vae = VAE(encoder, decoder, beta=beta)
     return vae
 
 
@@ -108,34 +109,60 @@ def get_filename_from_params(params, epochs):
 
     Returns: Filename created from the given parameters.
     """
-    filename = 'vae_'
+    filename = ''
 
     enc_hidden_dim = params['encoder'].get('hidden_dim')
     enc_latent_dim = params['encoder'].get('latent_dim')
-    enc_dropout_rate = params['encoder'].get('dropout_rate')
-    enc_initializer = params['encoder'].get('initializer')
-    enc_activation = params['encoder'].get('activation')
+    enc_beta = params['vae'].get('beta')
 
     if enc_hidden_dim is not None:
-        filename += 'h_dim_'
+        filename += 'h_'
         for dim in enc_hidden_dim:
-            filename += f'{dim}_'
+            filename += f'{dim}'
 
     if enc_latent_dim is not None:
-        filename += f'z_dim_{enc_latent_dim}_'
+        filename += f'z_{enc_latent_dim}'
 
-    if enc_dropout_rate is not None:
-        enc_dropout_rate_str = str(enc_dropout_rate).replace('.', '')
-        filename += f'dropout_{enc_dropout_rate_str}_'
+    if enc_beta is not None:
+        filename += f'b_{enc_beta}'
 
-    if enc_initializer is not None:
-        filename += f'init_{enc_initializer}_'
-
-    if enc_activation is not None:
-        filename += f'act_{enc_activation}'
-
-    filename += f'_epochs_{epochs}'
+    filename += f'e_{epochs}'
     return filename
+
+
+def load_or_train_model(path, params, train_data, epochs):
+    """ Load a VAE model from the given filepath.
+
+    If a model exists at the given filepath, it is loaded and returned, otherwise a new model is created and returned.
+
+    Args:
+        path (str): Path to load the model from.
+        params (dict): Dictionary of parameters.
+        epochs (int): Desired training epochs.
+        train_data (tf.data.Dataset): Training data.
+
+    Returns: VAE model loaded from the given filepath or a new model.
+    """
+
+    filepath = os.path.join(path, get_filename_from_params(params, epochs))
+    input_dim = train_data.element_spec[0].shape[0]
+    if os.path.exists(filepath):
+        vae = load_vae(filepath)
+        vae.compile()
+        print(f'Loaded model from {filepath}.')
+    else:
+        print(f'No model found at {filepath}. Creating new model.')
+        encoder = create_vae_encoder(input_dim=input_dim, **params['encoder'])
+        decoder = create_vae_decoder(output_dim=input_dim, **params['decoder'])
+        vae = VAE(encoder, decoder, **params['vae'])
+        vae.compile()
+        print('Training model.')
+        vae.fit(train_data.batch(128), epochs=epochs, verbose=0)
+        if not os.path.exists(filepath):
+            os.makedirs(filepath)
+        save_vae(vae, filepath)
+        print(f'Saved model to {filepath}.')
+    return vae
 
 
 class VAECrossValidator:

@@ -38,6 +38,49 @@ def generate_data(filepath):
     return train_x_norm, train_y, test_x_norm, test_y
 
 
+def generate_data_thickness_only(filepath, validation_split=0.2):
+    """ Generates data to be used in model training, returning data only from columns containing thickness data
+
+    Args:
+        filepath (str): path to the csv file containing the data
+        validation_split (float): fraction of the data to be used for validation
+
+    Returns: train_data, val_data, test_data
+    """
+
+    db = pd.read_csv(filepath)
+    enc_sex = OneHotEncoder(sparse_output=False)
+    enc_age = OneHotEncoder(sparse_output=False)
+    one_hot_sex = enc_sex.fit_transform(db['sex'].values.reshape(-1, 1))
+    age = db[['age']].round(0)
+    one_hot_age = enc_age.fit_transform(age['age'].values.reshape(-1, 1))
+    condition_indices = db[db['dcode'] == 0].index
+    # Select columns ending with '_thickness'
+    thickness_columns = [col for col in db.columns if col.endswith('_thickness')]
+
+    # Extract the data from the selected columns
+    data = db[thickness_columns]
+
+    # Create two new datasets based on the condition indices
+    train_x = data.loc[condition_indices]
+    test_x = data.loc[~db.index.isin(condition_indices)]
+
+    y_data = np.concatenate((one_hot_age, one_hot_sex), axis=1).astype('float32')
+    scaler = StandardScaler()
+
+    train_x_norm = scaler.fit_transform(train_x)
+    test_x_norm = scaler.transform(test_x)
+    train_y = y_data[condition_indices, :]
+    test_y = y_data[~db.index.isin(condition_indices), :]
+
+    train_x, val_x, train_y, val_y = train_test_split(train_x, train_y, test_size=validation_split)
+    val = tf.data.Dataset.from_tensor_slices((val_x, val_y))
+    train = tf.data.Dataset.from_tensor_slices((train_x, train_y))
+    test = tf.data.Dataset.from_tensor_slices((test_x, test_y))
+
+    return train, val, test
+
+
 def data_train_test(filepath):
     """
     Generate data to be used in model training

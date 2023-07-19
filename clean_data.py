@@ -1,5 +1,6 @@
 import pandas as pd
 from pathlib import Path
+import sys
 
 PROJECT_ROOT = Path.cwd()
 
@@ -11,14 +12,30 @@ def main():
     are stored for later use
     """
     # -------------------------------------------------------------------------
-    filepath = PROJECT_ROOT / 'data' / 'megasample.csv'
+    if len(sys.argv) < 2:
+        print("Please provide the name of the CSV file as a command line argument.")
+        return
 
-    output_filename = 'megasample_cleaned.csv'
-    output_dir = PROJECT_ROOT / 'outputs'
+    filename = sys.argv[1]
+    filepath = PROJECT_ROOT / 'data' / filename
+
+    output_filename = filename.split('.')[0] + '_cleaned.csv'
+    output_dir = PROJECT_ROOT / 'data' / 'cleaned_data'
     # -------------------------------------------------------------------------
+    # Print Terminal Output if input file is not found
+    if not filepath.exists():
+        print(f"File {filepath} not found!")
+        return
+
+    if not output_dir.exists():
+        output_dir.mkdir()
 
     db = pd.read_csv(filepath)
-    db.drop(['X', 'ID', 'Unnamed: 0', 'subID'], axis=1, inplace=True)
+    # check if 'X' and 'Unnamed: 0' exist and drop them if they do
+    if 'X' in db.columns:
+        db.drop('X', axis=1, inplace=True)
+    if 'Unnamed: 0' in db.columns:
+        db.drop('Unnamed: 0', axis=1, inplace=True)
     db.drop(db[db['sample'] == 'utrecht'].index, inplace=True)
     db.to_csv(output_dir / output_filename, index=False)
 

@@ -32,7 +32,10 @@ def create_vae_decoder(latent_dim, hidden_dim, output_dim, activation='relu', in
 
     # Add the hidden layers
     x = decoder_input
-    for h_dim in hidden_dim[1:]:
+    # Reverse the order of the hidden layers
+    hidden_dim = hidden_dim[::-1]
+    # Add the hidden layers
+    for h_dim in hidden_dim:
         x = keras.layers.Dense(h_dim, activation=activation, kernel_initializer=initializer)(x)
         x = keras.layers.Dropout(dropout_rate)(x)
 
@@ -61,6 +64,13 @@ def calc_kl_loss(mu, log_var):
     loss = -0.5 * (1 + log_var - tf.square(mu) - tf.exp(log_var))
     loss = tf.reduce_mean(tf.reduce_sum(loss, axis=1))
     return loss
+
+
+def r2_score(y_true, y_predicted):
+    residual = tf.reduce_sum(tf.square(tf.subtract(y_true, y_predicted)))
+    total = tf.reduce_sum(tf.square(tf.subtract(y_true, tf.reduce_mean(y_true))))
+    r2 = tf.subtract(1.0, tf.divide(residual, total))
+    return r2
 
 
 class VAE(keras.Model):
@@ -130,10 +140,13 @@ class VAE(keras.Model):
         reconstruction_loss = self.reconstruction_loss_fn(x, x_reconstructed)
         kl_loss = tf.reduce_mean(self.kl_loss_fn(z_mean, z_log_var))
         total_loss = reconstruction_loss + kl_loss
+        x = tf.cast(x, dtype=tf.float32)
+        r2 = r2_score(x, x_reconstructed)
         return {
             "reconstruction_loss": reconstruction_loss,
             "kl_loss": kl_loss,
             "total_loss": total_loss,
+            "r2": r2
         }
 
     def call(self, data, training=False, mask=None):
