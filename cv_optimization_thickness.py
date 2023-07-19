@@ -1,3 +1,9 @@
+""" Script to perform cross validation on the VAE model for the thickness data.
+
+This script also contains some general visualizations of the results of the cross validation, with the intention of
+ understanding the distribution of the results over the tested hyperparameters.
+"""
+#%% Imports
 from modelUtils.vae_utils import create_param_grid, VAECrossValidator
 import os
 import pickle
@@ -10,12 +16,12 @@ print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 save_path = cur + '/../outputs/models/vae/'
 if not os.path.exists(save_path):
     os.makedirs(save_path)
-#%%
-filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
+#%% Load Data
+filepath = os.path.join(cur, 'data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
 train_data, val_data, test_data = generate_data_thickness_only(filepath)
 input_dim = train_data.element_spec[0].shape[0]
 
-#%%
+#%% Defining the Cross Validation
 latent_dims = [2, 3, 4, 5, 7, 10, 15, 20]
 beta = [0.001, 0.005, 0.0005]
 hidden_dims = [[25, 25], [50, 25], [50, 50], [100, 50], [75, 50], [150, 100], [150, 100, 50]]
@@ -25,10 +31,10 @@ epochs = 200
 param_grid = create_param_grid(hidden_dims, latent_dims, dropout, ['relu'], ['glorot_uniform'], betas=beta)
 cv = VAECrossValidator(param_grid, input_dim, 5, batch_size=128, save_path=save_path)
 
-#%%
+#%% Running the Cross Validation
 results = cv.cross_validate(train_data, epochs=epochs, verbose=0)
 
-#%%
+#%% Saving the Results
 with open('../outputs/CrossVal/cv_thickness.pkl', 'wb') as file:
     pickle.dump(results, file)
 
@@ -38,6 +44,8 @@ with open('../outputs/CrossVal/cv_thickness.pkl', 'rb') as file:
 
 df = pd.DataFrame(columns=['Hidden Dimensions', 'Latent Dimensions', 'Beta', 'Dropout', 'Activation', 'Initializer',
                            'Total Loss', 'Reconstruction Loss', 'KL Loss'])
+
+#%% Extracting the Results
 for model in results:
     (params, result) = model
     # Extract the parameters
@@ -59,5 +67,7 @@ for model in results:
                'Total Loss': total_loss, 'Reconstruction Loss': recon_loss, 'KL Loss': kl_loss}
 
     # Append the new row to the DataFrame
-    df = df.append(new_row, ignore_index=True)
+    df.loc[len(df)] = new_row
 
+#%% Print the minimum reconstruction loss
+print(df.loc[df['Reconstruction Loss'].idxmin()])

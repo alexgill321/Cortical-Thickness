@@ -103,6 +103,9 @@ def train_val_vae(vae, train_data, val_data, early_stop=None, epochs=200, savefi
 def get_filename_from_params(params, epochs):
     """ Create a filename from the given parameters.
 
+    Example filename for a VAE with 2 hidden layers of [100, 100], 10 latent dimensions and beta=0.1 trained for 200
+    epochs: 'h_100100z_10b_1e_200'
+
     Args:
         params (dict): Dictionary of parameters.
         epochs (int): Number of epochs to train for.
@@ -124,7 +127,8 @@ def get_filename_from_params(params, epochs):
         filename += f'z_{enc_latent_dim}'
 
     if enc_beta is not None:
-        filename += f'b_{enc_beta}'
+        enc_beta_str = str(enc_beta).replace('.', '').lstrip('0')
+        filename += f'b_{enc_beta_str}'
 
     filename += f'e_{epochs}'
     return filename

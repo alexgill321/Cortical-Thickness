@@ -4,6 +4,18 @@ from tensorflow import keras
 
 def create_vae_encoder(input_dim, hidden_dim, latent_dim, activation='relu', initializer='glorot_uniform',
                        dropout_rate=0.2):
+    """Creates an encoder for a Variational Autoencoder
+
+    Args:
+        input_dim (int): The dimension of the input data
+        hidden_dim (list): A list of the hidden dimensions for the encoder
+        latent_dim (int): The dimensionality of the latent space
+        activation (str): The activation function to use for the hidden layers
+        initializer (str): The initializer to use for the hidden layers
+        dropout_rate (float): The dropout rate to use for the hidden layers
+
+    Returns: The encoder model with the specified layers and parameters
+    """
     inputs = keras.layers.Input(shape=(input_dim,))
     x = inputs
     for h_dim in hidden_dim:
@@ -27,6 +39,18 @@ def create_vae_encoder(input_dim, hidden_dim, latent_dim, activation='relu', ini
 
 def create_vae_decoder(latent_dim, hidden_dim, output_dim, activation='relu', initializer='glorot_uniform',
                        dropout_rate=0.2):
+    """Creates a decoder for a Variational Autoencoder
+
+    Args:
+        latent_dim (int): The dimensionality of the latent space
+        hidden_dim (list): A list of the hidden dimensions for the decoder
+        output_dim (int): The dimension of the output data
+        activation (str): The activation function to use for the hidden layers
+        initializer (str): The initializer to use for the hidden layers
+        dropout_rate (float): The dropout rate to use for the hidden layers
+
+    Returns: The decoder model with the specified layers and parameters
+    """
     # Define the input layer
     decoder_input = keras.layers.Input(shape=(latent_dim,), name='decoder_input')
 
@@ -67,6 +91,14 @@ def calc_kl_loss(mu, log_var):
 
 
 def r2_score(y_true, y_predicted):
+    """Calculates the R2 score
+
+    Args:
+        y_true (tensor): The true values
+        y_predicted (tensor): The predicted values
+
+    Returns: The R2 score
+    """
     residual = tf.reduce_sum(tf.square(tf.subtract(y_true, y_predicted)))
     total = tf.reduce_sum(tf.square(tf.subtract(y_true, tf.reduce_mean(y_true))))
     r2 = tf.subtract(1.0, tf.divide(residual, total))
@@ -90,6 +122,7 @@ class VAE(keras.Model):
         reconstruction_loss_fn (function): The function to use to calculate the reconstruction loss
         kl_loss_fn (function): The function to use to calculate the KL divergence loss
         optimizer (tf.keras.optimizers.Optimizer): The optimizer to use to train the model
+        beta (float): The weight to use for the KL divergence loss
     """
     def __init__(
             self,
