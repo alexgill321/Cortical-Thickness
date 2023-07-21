@@ -404,6 +404,15 @@ class TestVAEUtils(unittest.TestCase):
         if os.path.exists(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename)):
             shutil.rmtree(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename))
 
+    def test_cross_validate_df(self):
+        param_grid = create_param_grid([[100, 100]], [20], [0.2], ['relu'], ['glorot_uniform'], betas=[.001])
+        self.vae.compile()
+        save_path = os.path.join(os.getcwd(), '../outputs/models/vae/')
+        cv = VAECrossValidator(param_grid, self.input_dim, k_folds=5, save_path=save_path)
+        results = cv.cross_validate_as_df(self.train_data, epochs=10)
+
+        self.assertEqual(len(results), 5)
+
 
 if __name__ == '__main__':
     unittest.main()
