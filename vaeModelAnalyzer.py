@@ -6,6 +6,28 @@ import tensorflow as tf
 
 
 class VAEModelAnalyzer:
+    """ Class for analyses of VAE models
+
+    This class can be used to perform a full analysis of a VAE model. The full-stack analysis includes the following:
+        1. Latent Space Visualization
+        2. Latent Dimension Visualization
+        3. Top 5 Validation Clusters in Latent Space Visualization
+        4. Latent Influence on Reconstruction Features Visualization
+        5. Mean Latent Influence Visualization
+        6. Reconstruction Error Histogram Visualization
+        7. R2 Metric
+        8. Reconstruction Error by Feature Metric
+
+    The full functionality of these visualizations is described in the documentation of the vis_utils module.
+
+    Attributes:
+        model: A trained VAE model
+        data: A single batch of validation data to be used for the analysis
+        z: The dimensionality of the latent space
+        feat_labels: The labels of the features in the data
+        model_info (optional): A dictionary containing information about the model, such as the hyperparameters used
+        model_results: A dictionary containing the metric results of the analysis
+    """
     def __init__(self, model, data, z, feat_labels, model_info=None):
         self.model = model
         self.data = data
@@ -15,30 +37,18 @@ class VAEModelAnalyzer:
         self.model_results = {}
 
     def full_stack(self, save_path):
+        """ Perform a full-stack analysis of the model, generating all visualizations and metrics
+
+        Args:
+            save_path: The path to save the visualizations to
+        """
+
         # P1
         vu.visualize_latent_space(self.model, self.data, savefile=save_path + '/latent_space.png')
         vu.plot_latent_dimensions(self.model, self.data, z_dim=self.z, savefile=save_path + '/latent_dimensions.png')
 
         # P2
-        num_clusters = 30
-        k_mean = KMeans(num_clusters, n_init='auto', random_state=42)
-        cluster_labels = k_mean.fit_predict(self.data[0])
-
-        silhouette_vals = silhouette_samples(self.data[0], cluster_labels)
-
-        silhouette_scores = []
-        for i in range(num_clusters):
-            score = np.mean(silhouette_vals[cluster_labels == i])
-            silhouette_scores.append((i, score))
-
-        top_clusters = sorted(silhouette_scores, key=lambda x: x[1], reverse=True)[:5]
-        top_cluster_indices = []
-
-        for idx, _ in top_clusters:
-            top_indexes = np.where(cluster_labels == idx)[0]
-            top_cluster_indices.append(top_indexes)
-
-        vu.visualize_top_clusters(self.model, self.data, top_cluster_indices,
+        vu.visualize_top_clusters(self.model, self.data, num_clusters=30, top_k=5,
                                   savefile=save_path + '/top_5_clusters.png')
 
         # P3

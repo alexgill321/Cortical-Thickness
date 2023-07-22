@@ -5,11 +5,23 @@ import seaborn as sns
 from sklearn.cluster import KMeans
 import pandas as pd
 import matplotlib.patches as mpatches
+from sklearn.metrics import silhouette_samples
 import tensorflow as tf
 from scipy import stats
 
 
 def visualize_latent_space(vae, data, labels=None, savefile=None):
+    """ Visualize the latent space of a VAE model
+
+    This function encodes the input data using the vae model, then applies t-SNE to reduce the dimensionality of the
+    latent space to 2D. The resulting 2D latent space is then plotted using a scatter plot.
+
+    Args:
+        vae: A trained VAE model
+        data: A single batch of data to be used for the analysis
+        labels (optional): A list of labels for the data
+        savefile (optional): The path to the file to save the visualization to
+    """
 
     # 1. Encode input samples
     z_mean, z_log_var, z, _ = vae(data)
@@ -34,8 +46,17 @@ def visualize_latent_space(vae, data, labels=None, savefile=None):
 
 
 def visualize_latent_space_multiple(vae_models, data, labels, savefile=None):
+    """ Visualize the latent space of multiple VAE models
 
-    z_results = []
+    This function encodes the input data using each of the vae models, then applies t-SNE to reduce the dimensionality
+    of the latent space to 2D. The resulting 2D latent space is then plotted using a scatter plot.
+
+    Args:
+        vae_models: A list of trained VAE models
+        data: A single batch of data to be used for the analysis
+        labels: A list of labels for the data
+        savefile (optional): The path to the file to save the visualization to
+    """
     fig = plt.figure(figsize=(8, 6))
     for i in range(len(vae_models)):
         model = vae_models[i]
@@ -55,6 +76,20 @@ def visualize_latent_space_multiple(vae_models, data, labels, savefile=None):
 
 
 def latent_clustering(vae, data, num_clusters, savefile=None):
+    """ Cluster the latent space of a VAE model
+
+    This function encodes the input data using the vae model, then applies KMeans clustering to the latent space. The
+    resulting clusters are then plotted on the tsne reduced latent space using a scatter plot.
+
+    Args:
+        vae: A trained VAE model
+        data: A single batch of data to be used for the analysis
+        num_clusters: The number of clusters to use for the KMeans clustering
+        savefile (optional): The path to the file to save the visualization to
+
+    Returns:
+        labels: The cluster labels for each sample in the data
+    """
     # Assuming X is your high dimensional data.
 
     # 1. Encode input samples
@@ -86,7 +121,17 @@ def latent_clustering(vae, data, num_clusters, savefile=None):
 
 
 def plot_latent_dimensions(vae, data, z_dim, savefile=None):
+    """ Plot the distribution of each dimension in the latent space
 
+    This function encodes the input data using the vae model, then plots the distribution of each dimension in the
+    latent space using a histogram.
+
+    Args:
+        vae: A trained VAE model
+        data: A single batch of data to be used for the analysis
+        z_dim: The dimensionality of the latent space
+        savefile (optional): The path to the file to save the visualization to
+    """
     n_cols = 3
     n_rows = int(np.ceil(z_dim / n_cols))
 
@@ -110,7 +155,18 @@ def plot_latent_dimensions(vae, data, z_dim, savefile=None):
 
 
 def plot_latent_dimensions_multiple(vae_models, data, z_dim, labels, savefile=None):
+    """ Plot the distribution of each dimension in the latent space for multiple VAE models
 
+    This function encodes the input data using each of the vae models, then plots the distribution of each dimension in
+    the latent space using a histogram.
+
+    Args:
+        vae_models: A list of trained VAE models
+        data: A single batch of data to be used for the analysis
+        z_dim: The dimensionality of the latent space
+        labels: A list of labels for the data
+        savefile (optional): The path to the file to save the visualization to
+    """
     n_cols = 3
     n_rows = int(np.ceil(z_dim / n_cols))
 
@@ -138,7 +194,39 @@ def plot_latent_dimensions_multiple(vae_models, data, z_dim, labels, savefile=No
     plt.close()
 
 
-def visualize_top_clusters(vae, data, top_cluster_indices, savefile=None):
+def visualize_top_clusters(vae, data, num_clusters, top_k, savefile=None):
+    """ Visualize the top clusters on raw data in the latent space
+
+    This function generates the top clusters on the raw input data in the high dimensional feature space using K means
+    clustering. Then using silhouette scores it determines which clusters have the highest score.The input data is then
+    encoded using the vae model, and tsne is used to reduce the dimensionality of the latent space to 2D. The resulting
+    latent space is then plotted using a scatter plot, with the top clusters highlighted.
+
+    The purpose of this visualization is to see if the clusters remain distinct in the latent space.
+
+    Args:
+        vae: A trained VAE model
+        data: A single batch of data to be used for the analysis
+        num_clusters: The number of clusters used for the KMeans clustering
+        top_k: The number of top clusters to visualize
+        savefile (optional): The path to the file to save the visualization to
+    """
+    k_mean = KMeans(num_clusters, n_init='auto', random_state=42)
+    cluster_labels = k_mean.fit_predict(data[0])
+
+    silhouette_vals = silhouette_samples(data[0], cluster_labels)
+
+    silhouette_scores = []
+    for i in range(num_clusters):
+        score = np.mean(silhouette_vals[cluster_labels == i])
+        silhouette_scores.append((i, score))
+
+    top_clusters = sorted(silhouette_scores, key=lambda x: x[1], reverse=True)[:top_k]
+    top_cluster_indices = []
+
+    for idx, _ in top_clusters:
+        top_indexes = np.where(cluster_labels == idx)[0]
+        top_cluster_indices.append(top_indexes)
 
     # 1. Encode input samples
     z_mean, z_log_var, z, _ = vae(data)
@@ -177,7 +265,21 @@ def visualize_top_clusters(vae, data, top_cluster_indices, savefile=None):
 
 
 def visualize_latent_influence(vae, data, z_dim, savefile=None):
+    """ Visualize the influence of each dimension in the latent space
 
+    This function encodes the input data using the vae model, then for each dimension in the latent space it alters the
+    latent vector by increasing the value of that dimension by 50%. The altered latent vector is then decoded and the
+    error between the original and altered input is calculated. The mean error for each dimension is then plotted.
+
+    The purpose of this visualization is to see which dimensions in the latent space have the most influence on the
+    output.
+
+    Args:
+        vae: A trained VAE model
+        data: A single batch of data to be used for the analysis
+        z_dim: The number of dimensions in the latent space
+        savefile (optional): The path to the file to save the visualization to
+    """
     # 1. Encode input samples
     z_mean, z_log_var, z, original_recon = vae(data)
     z = z.numpy()
@@ -220,7 +322,24 @@ def visualize_latent_influence(vae, data, z_dim, savefile=None):
 
 
 def visualize_latent_interpolation(vae, data, z_dim, feat_labels, num_features=10, savefile=None):
+    """ Visualize the influence of each dimension in the latent space on individual features
 
+    This function encodes the input data using the vae model, then for each dimension in the latent space it alters the
+    latent vector by increasing the value of that dimension by 50%. The altered latent vector is then decoded and the
+    error between the original and altered input is calculated. The mean error for each dimension is then plotted for
+    each of the features being analyzed.
+
+    The purpose of this visualization is to see which dimensions in the latent space have the most influence on the
+    output of specific features.
+
+    Args:
+        vae: A trained VAE model
+        data: A single batch of data to be used for the analysis
+        z_dim: The number of dimensions in the latent space
+        feat_labels: A list of the feature labels for the features being analyzed
+        num_features: The number of features to analyze
+        savefile (optional): The path to the file to save the visualization to
+    """
     # 1. Encode input samples
     z_mean, z_log_var, z, original_recon = vae(data)
     z = z.numpy()
@@ -275,7 +394,23 @@ def visualize_latent_interpolation(vae, data, z_dim, feat_labels, num_features=1
 
 
 def visualize_errors_hist(vae, data, savefile=None):
-    """ Creates a Histogram of the mean reconstruction errors. """
+    """ Creates a Histogram of the mean reconstruction errors.
+
+    This function encodes the input data using the vae model, then decodes the latent space to generate a reconstruction
+    of the input. The error between the original input and the reconstruction is then calculated. The mean error for
+    each sample is then calculated and a histogram of the mean errors is plotted. A normal distribution is then fit to
+    the histogram, and the mean and standard deviation of the distribution are printed. Using this information, the
+    p-value of the mean error is calculated and printed. Using the p-value, the null hypothesis that the mean error is
+    normally distributed is either accepted or rejected, which is represented by the color of the p-value line on the
+    histogram.
+
+    The purpose of this visualization is to see if the model has a particular bias in the reconstruction of the input.
+
+    Args:
+        vae: A trained VAE model
+        data: A single batch of data to be used for the analysis
+        savefile (optional): The path to the file to save the visualization to
+    """
 
     x, y = data
     x = tf.cast(x, dtype=tf.float32)

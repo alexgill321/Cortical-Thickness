@@ -215,7 +215,7 @@ class TestVAEUtils(unittest.TestCase):
     def setUp(self):
         cur = os.getcwd()
         filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-        self.train_data, self.val_data, self.test_data = generate_data_thickness_only(filepath)
+        self.train_data, self.val_data, self.test_data, _ = generate_data_thickness_only(filepath)
         self.input_dim = self.train_data.element_spec[0].shape[0]
         self.batch_size = 128
         self.epochs = 10
@@ -406,11 +406,22 @@ class TestVAEUtils(unittest.TestCase):
             shutil.rmtree(os.path.join(os.getcwd(), '../outputs/models/vae/' + filename))
 
     def test_cross_validate_df(self):
+        # TODO: Finish this test
         param_grid = create_param_grid([[100, 100]], [20], [0.2], ['relu'], ['glorot_uniform'], betas=[.001])
         self.vae.compile()
         save_path = os.path.join(os.getcwd(), '../outputs/models/vae/')
         cv = VAECrossValidator(param_grid, self.input_dim, k_folds=5, save_path=save_path)
-        results = cv.cross_validate_as_df(self.train_data, epochs=10)
+        results = cv.cross_validate_df(self.train_data, epochs=10)
+
+        self.assertEqual(len(results), 5)
+
+    def test_cross_validate_df_val(self):
+        # TODO: Finish this test
+        param_grid = create_param_grid([[100, 100]], [20], [0.2], ['relu'], ['glorot_uniform'], betas=[.01])
+        self.vae.compile()
+        save_path = os.path.join(os.getcwd(), '../outputs/models/vae/')
+        cv = VAECrossValidator(param_grid, self.input_dim, k_folds=5, save_path=save_path)
+        results = cv.cross_validate_df_val(self.train_data, epochs=10, val_data=self.val_data)
 
         self.assertEqual(len(results), 5)
 

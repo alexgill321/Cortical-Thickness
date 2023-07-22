@@ -249,7 +249,7 @@ class VAECrossValidator:
             results.append((params, metrics))
         return results
 
-    def cross_validate_as_df(self, data, epochs=200, verbose=1):
+    def cross_validate_df(self, data, epochs=200, verbose=1):
         results = pd.DataFrame(columns=['Hidden Dimensions', 'Latent Dimensions', 'Beta', 'Dropout', 'Activation',
                                         'Initializer', 'Total Loss', 'Reconstruction Loss', 'KL Loss', 'R2',
                                         'Validation Total Loss History', 'Validation Reconstruction Loss History',
@@ -332,6 +332,94 @@ class VAECrossValidator:
                     with open(savefile, 'wb') as f:
                         pickle.dump(new_row, f)
                     save_vae(vae, save_dir)
+            results.loc[len(results)] = new_row
+        return results
+
+    def cross_validate_df_val(self, train_data, val_data, epochs=200, verbose=1):
+        results = pd.DataFrame(columns=['Hidden Dimensions', 'Latent Dimensions', 'Beta', 'Dropout', 'Activation',
+                                        'Initializer', 'Total Loss', 'Reconstruction Loss', 'KL Loss', 'R2',
+                                        'Validation Total Loss History', 'Validation Reconstruction Loss History',
+                                        'Validation KL Loss History', 'Training Total Loss History',
+                                        'Training KL Loss History', 'Training Reconstruction Loss History',
+                                        'Parameters'])
+        data = train_data.shuffle(10000).batch(self.batch_size)
+        val_data = val_data.batch(val_data.cardinality().numpy())
+        for params in self.param_grid:
+            new_row = {}
+            filename = get_filename_from_params(params, epochs)
+            save_dir = os.path.join(self.save_path, filename)
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+
+            val_total_losses = []
+            val_recon_losses = []
+            val_kl_losses = []
+            training_recon_losses = []
+            training_kl_losses = []
+            training_total_losses = []
+            kl_losses = []
+            val_total = []
+            val_recon = []
+            val_kl = []
+            r2_list = []
+            savefile = os.path.join(save_dir, 'results.pkl')
+            if os.path.exists(savefile):
+                print(f"Loading model results from {savefile}")
+                with open(savefile, 'rb') as f:
+                    new_row = pickle.load(f)
+            else:
+                print(f"\nTraining model with parameters {params}")
+                for i in tqdm(range(self.kf.n_splits), desc="Fold Progress", ncols=80):
+                    if verbose > 0:
+                        print(f"Creating new model for parameters {params}")
+                    encoder = create_vae_encoder(input_dim=self.input_dim, **params['encoder'])
+                    decoder = create_vae_decoder(output_dim=self.input_dim, **params['decoder'])
+                    vae = VAE(encoder, decoder, **params['vae'])
+                    vae.compile()
+
+                    # Create train and validation datasets for this fold
+                    cv_val_data = data.shard(self.kf.n_splits, i)
+                    train_data = data.shard(self.kf.n_splits, (i+1) % self.kf.n_splits)
+
+                    for j in range(2, self.kf.n_splits):
+                        train_data = train_data.concatenate(data.shard(self.kf.n_splits, (i+j) % self.kf.n_splits))
+
+                    vae, hist = train_val_vae(vae, train_data, cv_val_data, verbose=verbose, epochs=epochs)
+
+                    val_total_losses.append(np.min(hist.history['val_total_loss']))
+                    val_recon_losses.append(np.min(hist.history['val_reconstruction_loss']))
+                    val_kl_losses.append(np.min(hist.history['val_kl_loss']))
+                    val_total.append(hist.history['val_total_loss'])
+                    val_recon.append(hist.history['val_reconstruction_loss'])
+                    val_kl.append(hist.history['val_kl_loss'])
+                    training_recon_losses.append((hist.history['reconstruction_loss']))
+                    training_kl_losses.append(hist.history['kl_loss'])
+                    training_total_losses.append(hist.history['total_loss'])
+                    _, r2, _, _ = vae.evaluate(val_data, verbose=verbose)
+                    r2_list.append(r2)
+
+                new_row['Total Loss'] = np.mean(val_total_losses)
+                new_row['Reconstruction Loss'] = np.mean(val_recon_losses)
+                new_row['KL Loss'] = np.mean(val_kl_losses)
+                new_row['Validation Total Loss History'] = np.mean(val_total, axis=0)
+                new_row['Validation Reconstruction Loss History'] = np.mean(val_recon, axis=0)
+                new_row['Validation KL Loss History'] = np.mean(val_kl, axis=0)
+                new_row['Training Total Loss History'] = np.mean(training_total_losses, axis=0)
+                new_row['Training Reconstruction Loss History'] = np.mean(training_recon_losses, axis=0)
+                new_row['Training KL Loss History'] = np.mean(training_kl_losses, axis=0)
+                new_row['KL Loss History'] = np.mean(kl_losses, axis=0)
+                new_row['R2'] = np.mean(r2_list)
+                new_row['Parameters'] = params
+                new_row['Hidden Dimensions'] = params['encoder']['hidden_dim']
+                new_row['Latent Dimensions'] = params['encoder']['latent_dim']
+                new_row['Beta'] = params['vae']['beta']
+                new_row['Dropout'] = params['encoder']['dropout_rate']
+                new_row['Activation'] = params['encoder']['activation']
+                new_row['Initializer'] = params['encoder']['initializer']
+
+                with open(savefile, 'wb') as f:
+                    pickle.dump(new_row, f)
+                save_vae(vae, save_dir)
             results.loc[len(results)] = new_row
         return results
 

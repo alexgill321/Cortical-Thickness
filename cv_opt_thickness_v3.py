@@ -16,14 +16,14 @@ if not os.path.exists(save_path):
     os.makedirs(save_path)
 #%% Load Data
 filepath = os.path.join(cur, 'data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-train_data, val_data, test_data,_ = generate_data_thickness_only(filepath)
+train_data, val_data, test_data, _ = generate_data_thickness_only(filepath)
 val_batch_size = val_data.cardinality().numpy()
 val_data_batched = val_data.batch(val_batch_size)
 input_dim = train_data.element_spec[0].shape[0]
 
 #%% Defining the Cross Validation
-latent_dims = [3, 4, 5, 10]
-beta = [0.001, 0.0006, 0.0003, 0.0001, 0.00005]
+latent_dims = [3, 4, 5, 10, 15, 20]
+beta = [0.001, 0.005, 0.01]
 hidden_dims = [[150, 100], [200, 150], [150, 150], [200, 200], [200, 100], [300, 150], [300, 200]]
 dropout = [0.2]
 epochs = 300
@@ -32,13 +32,17 @@ param_grid = create_param_grid(hidden_dims, latent_dims, dropout, ['relu'], ['gl
 cv = VAECrossValidator(param_grid, input_dim, 5, batch_size=128, save_path=save_path)
 
 #%% Running the Cross Validation
-results = cv.cross_validate_as_df(train_data, epochs=epochs, verbose=0)
-with open('outputs/CrossVal/cv_thickness_v4.pkl', 'wb') as file:
+results = cv.cross_validate_df_val(train_data, val_data, epochs=epochs, verbose=0)
+with open('outputs/CrossVal/cv_thickness_v5.pkl', 'wb') as file:
     pickle.dump(results, file)
 
 #%%
-with open('outputs/CrossVal/cv_thickness_v3.pkl', 'rb') as file:
+with open('outputs/CrossVal/cv_thickness_v5.pkl', 'rb') as file:
     results = pickle.load(file)
+
+#%% Save modified results
+with open('outputs/CrossVal/cv_thickness_v5.pkl', 'wb') as file:
+    pickle.dump(results, file)
 
 #%% Defining the Heatmap Function
 
@@ -55,6 +59,11 @@ def create_heatmap_kl(data, **kwargs):
 
 def create_heatmap_r2(data, **kwargs):
     heatmap_df = data.pivot(index='Beta', columns='Latent Dimensions', values='R2')
+    sns.heatmap(heatmap_df, annot=False, cmap='coolwarm', vmin=min_loss, vmax=max_loss, **kwargs)
+
+
+def create_heatmap_total(data, **kwargs):
+    heatmap_df = data.pivot(index='Beta', columns='Latent Dimensions', values='Total Loss')
     sns.heatmap(heatmap_df, annot=False, cmap='coolwarm', vmin=min_loss, vmax=max_loss, **kwargs)
 
 
@@ -82,7 +91,7 @@ g.map_dataframe(create_heatmap_recon)
 g.set_axis_labels('Latent Dimensions', 'Beta')
 
 # Save the plot
-plt.savefig(save_path + 'heatmap_recon_loss_v3.png')
+plt.savefig(save_path + 'heatmap_recon_loss_v5.png')
 
 #%% Visualizing the Results for the KL Loss
 
@@ -102,7 +111,7 @@ g.map_dataframe(create_heatmap_kl)
 g.set_axis_labels('Latent Dimensions', 'Beta')
 
 # Save the plot
-plt.savefig(save_path + 'heatmap_kl_loss_v3.png')
+plt.savefig(save_path + 'heatmap_kl_loss_v5.png')
 
 #%% Visualizing the Results for the R2
 
@@ -122,7 +131,26 @@ g.map_dataframe(create_heatmap_r2)
 g.set_axis_labels('Latent Dimensions', 'Beta')
 
 # Save the plot
-plt.savefig(save_path + 'heatmap_r2_v3.png')
+plt.savefig(save_path + 'heatmap_r2_v5.png')
+
+#%% Visualizing the Results for the Total Loss
+
+min_loss = results['Total Loss'].min()
+max_loss = results['Total Loss'].max()
+
+print(min_loss, max_loss)
+
+# Create a FacetGrid with hidden dimensions as the column variable
+g = sns.FacetGrid(results, col='Hidden Dimensions')
+
+# Map the function to each facet (hidden dimension)
+g.map_dataframe(create_heatmap_total)
+
+# Set the labels for x-axis and y-axis
+g.set_axis_labels('Latent Dimensions', 'Beta')
+
+# Save the plot
+plt.savefig(save_path + 'heatmap_total_loss_v5.png')
 
 #%% Visualizing the Results for the Reconstruction Loss
 save_path = 'outputs/Images/CVAnalysis/'
@@ -150,7 +178,7 @@ g.set_titles(col_template="beta = {col_name}", row_template="h_dim = {row_name}"
 
 g.add_legend()
 
-g.savefig(save_path + 'val_recon_loss_v3.png')
+g.savefig(save_path + 'val_recon_loss_v5.png')
 
 #%% Visualizing the Results for the KL Loss
 save_path = 'outputs/Images/CVAnalysis/'
@@ -178,4 +206,4 @@ g.set_titles(col_template="beta = {col_name}", row_template="h_dim = {row_name}"
 
 g.add_legend()
 
-g.savefig(save_path + 'val_kl_loss_v3.png')
+g.savefig(save_path + 'val_kl_loss_v5.png')
