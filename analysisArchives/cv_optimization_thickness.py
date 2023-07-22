@@ -93,7 +93,7 @@ def create_heatmap_r2(data, **kwargs):
     sns.heatmap(heatmap_df, annot=False, cmap='coolwarm', vmin=min_loss, vmax=max_loss, **kwargs)
 
 
-save_path = '../outputs/Images/CVAnalysis/'
+save_path = '../../outputs/Images/CVAnalysis/'
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 

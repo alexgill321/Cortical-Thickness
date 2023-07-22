@@ -16,7 +16,7 @@ def visualize_latent_space(vae, data, labels=None, savefile=None):
     z = z.numpy()
 
     # 2. Apply t-SNE
-    tsne = TSNE(n_components=2, random_state=42)
+    tsne = TSNE(random_state=42)
     z_2d = tsne.fit_transform(z)
 
     # 3. Create a scatter plot
@@ -145,7 +145,7 @@ def visualize_top_clusters(vae, data, top_cluster_indices, savefile=None):
     z = z.numpy()
 
     # 2. Apply t-SNE
-    tsne = TSNE(n_components=2, random_state=42)
+    tsne = TSNE(random_state=42)
     z_2d = tsne.fit_transform(z)
 
     # 3. Create the labels for the clusters
@@ -316,7 +316,6 @@ def visualize_errors_hist(vae, data, savefile=None):
     if savefile:
         plt.savefig(savefile)
 
-    plt.show()
     plt.close()
 
 

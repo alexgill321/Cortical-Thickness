@@ -78,7 +78,7 @@ def generate_data_thickness_only(filepath, validation_split=0.2):
     train = tf.data.Dataset.from_tensor_slices((train_x, train_y))
     test = tf.data.Dataset.from_tensor_slices((test_x, test_y))
 
-    return train, val, test
+    return train, val, test, data.columns
 
 
 def data_train_test(filepath):

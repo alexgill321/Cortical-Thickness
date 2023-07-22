@@ -12,11 +12,12 @@ import numpy as np
 import tensorflow as tf
 from models.vae_models import VAE, calc_kl_loss, create_vae_encoder, create_vae_decoder
 import os
-from utils import generate_data_thickness_only
+from utils import generate_data_thickness_only, generate_feature_names
 from modelUtils.lr_utils import MultiOptimizerLearningRateScheduler, CyclicLR, ExponentialDecayScheduler
 from modelUtils.vae_utils import train_val_vae, create_vae, VAECrossValidator, save_vae, load_vae, \
     get_filename_from_params, create_param_grid
 import shutil
+from vaeModelAnalyzer import VAEModelAnalyzer
 
 
 class TestVAEModel(unittest.TestCase):
@@ -412,6 +413,51 @@ class TestVAEUtils(unittest.TestCase):
         results = cv.cross_validate_as_df(self.train_data, epochs=10)
 
         self.assertEqual(len(results), 5)
+
+
+class TestVAEAnalyzer(unittest.TestCase):
+    def setUp(self):
+        cur = os.getcwd()
+        filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
+        train_data, val_data, test_data, self.feat_labels = generate_data_thickness_only(filepath)
+        h_dim = [100, 100]
+        self.z_dim = 20
+        input_dim = train_data.element_spec[0].shape[0]
+        batch_size = 128
+        epochs = 10
+        lr = 0.001
+        encoder = create_vae_encoder(input_dim, h_dim, self.z_dim)
+        decoder = create_vae_decoder(self.z_dim, h_dim, input_dim)
+        vae = VAE(encoder, decoder)
+        vae.compile()
+        vae.fit(train_data.batch(batch_size), epochs=epochs, verbose=1)
+        self.model = vae
+        val_batch_size = val_data.cardinality().numpy()
+        val_data_batched = val_data.batch(val_batch_size)
+        self.data = next(iter(val_data_batched))
+
+    def test_create_analyzer(self):
+        analyzer = VAEModelAnalyzer(self.model, self.data, self.z_dim, self.feat_labels)
+        self.assertTrue(analyzer is not None)
+        self.assertEqual(analyzer.z, self.z_dim)
+        self.assertEqual(analyzer.data, self.data)
+        self.assertEqual(analyzer.model, self.model)
+
+    def test_full_stack(self):
+        analyzer = VAEModelAnalyzer(self.model, self.data, self.z_dim, self.feat_labels)
+        save_path = os.path.join(os.getcwd(), '../outputs/models/vae/test')
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        analyzer.full_stack(save_path)
+        self.assertTrue(os.path.exists(save_path))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'latent_space.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'latent_dimensions.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'top_5_clusters.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'latent_interpolation.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'latent_influence.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'errors_hist.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'feature_errors.csv')))
+        shutil.rmtree(save_path)
 
 
 if __name__ == '__main__':

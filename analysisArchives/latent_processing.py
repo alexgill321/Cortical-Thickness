@@ -15,19 +15,19 @@ model_table_data = []
 table_data_recon = []
 model_table_data_recon = []
 #%% Load the results
-with open('outputs/CrossVal/cv_finetune_latent_10.pkl', 'rb') as file:
+with open('../outputs/CrossVal/cv_finetune_latent_10.pkl', 'rb') as file:
     cv_10 = pickle.load(file)
 
-with open('outputs/CrossVal/cv_finetune_latent_15.pkl', 'rb') as file:
+with open('../outputs/CrossVal/cv_finetune_latent_15.pkl', 'rb') as file:
     cv_15 = pickle.load(file)
 
-with open('outputs/CrossVal/cv_finetune_latent_20.pkl', 'rb') as file:
+with open('../outputs/CrossVal/cv_finetune_latent_20.pkl', 'rb') as file:
     cv_20 = pickle.load(file)
 
-with open('outputs/CrossVal/cv_finetune_latent_25.pkl', 'rb') as file:
+with open('../outputs/CrossVal/cv_finetune_latent_25.pkl', 'rb') as file:
     cv_25 = pickle.load(file)
 
-with open('outputs/CrossVal/cv_finetune_latent_30.pkl', 'rb') as file:
+with open('../outputs/CrossVal/cv_finetune_latent_30.pkl', 'rb') as file:
     cv_30 = pickle.load(file)
 
 #%%
