@@ -61,6 +61,8 @@ def generate_data_thickness_only(filepath, validation_split=0.2):
     # Extract the data from the selected columns
     data = db[thickness_columns]
 
+    data.to_csv(filepath + '/../thickness_data.csv', index=False)
+
     # Create two new datasets based on the condition indices
     train_x = data.loc[condition_indices]
     test_x = data.loc[~db.index.isin(condition_indices)]
@@ -70,13 +72,15 @@ def generate_data_thickness_only(filepath, validation_split=0.2):
 
     train_x_norm = scaler.fit_transform(train_x)
     test_x_norm = scaler.transform(test_x)
+
     train_y = y_data[condition_indices, :]
     test_y = y_data[~db.index.isin(condition_indices), :]
 
-    train_x, val_x, train_y, val_y = train_test_split(train_x, train_y, test_size=validation_split)
+    train_x, val_x, train_y, val_y = train_test_split(train_x_norm, train_y, test_size=validation_split,
+                                                      random_state=42)
     val = tf.data.Dataset.from_tensor_slices((val_x, val_y))
     train = tf.data.Dataset.from_tensor_slices((train_x, train_y))
-    test = tf.data.Dataset.from_tensor_slices((test_x, test_y))
+    test = tf.data.Dataset.from_tensor_slices((test_x_norm, test_y))
 
     return train, val, test, data.columns
 

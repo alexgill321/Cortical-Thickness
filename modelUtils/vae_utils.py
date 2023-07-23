@@ -335,7 +335,7 @@ class VAECrossValidator:
             results.loc[len(results)] = new_row
         return results
 
-    def cross_validate_df_val(self, train_data, val_data, epochs=200, verbose=1):
+    def cross_validate_df_val(self, train_data, val_data, epochs=200, verbose=1, load=False):
         results = pd.DataFrame(columns=['Hidden Dimensions', 'Latent Dimensions', 'Beta', 'Dropout', 'Activation',
                                         'Initializer', 'Total Loss', 'Reconstruction Loss', 'KL Loss', 'R2',
                                         'Validation Total Loss History', 'Validation Reconstruction Loss History',
@@ -363,7 +363,7 @@ class VAECrossValidator:
             val_kl = []
             r2_list = []
             savefile = os.path.join(save_dir, 'results.pkl')
-            if os.path.exists(savefile):
+            if os.path.exists(savefile) and load:
                 print(f"Loading model results from {savefile}")
                 with open(savefile, 'rb') as f:
                     new_row = pickle.load(f)

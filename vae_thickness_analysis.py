@@ -12,7 +12,7 @@ val_batch_size = val_data.cardinality().numpy()
 val_data_batched = val_data.batch(val_batch_size)
 data = next(iter(val_data_batched))
 
-with open(os.path.join(cur, 'outputs/CrossVal/cv_thickness_v4_mod.pkl'), 'rb') as file:
+with open(os.path.join(cur, 'outputs/CrossVal/cv_thickness_v5.pkl'), 'rb') as file:
     cv_results = pkl.load(file)
 
 #%% Retrieve top 5 models for Reconstruction Loss
@@ -22,7 +22,7 @@ print(top_5_recon)
 for i, row in top_5_recon.iterrows():
     model = load_or_train_model(os.path.join(cur, 'outputs/models/vae'), row['Parameters'], train_data, epochs=300)
     analyzer = VAEModelAnalyzer(model, data, row['Latent Dimensions'], feat_labels)
-    save_path = os.path.join(cur, 'outputs/analysis/recon', get_filename_from_params(row['Parameters'], 300))
+    save_path = os.path.join(cur, 'outputs/analysis/recon_v2', get_filename_from_params(row['Parameters'], 300))
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     analyzer.full_stack(save_path)
@@ -34,7 +34,7 @@ print(top_5_total)
 for i, row in top_5_total.iterrows():
     model = load_or_train_model(os.path.join(cur, 'outputs/models/vae'), row['Parameters'], train_data, epochs=300)
     analyzer = VAEModelAnalyzer(model, data, row['Latent Dimensions'], feat_labels)
-    save_path = os.path.join(cur, 'outputs/analysis/total', get_filename_from_params(row['Parameters'], 300))
+    save_path = os.path.join(cur, 'outputs/analysis/total_v2', get_filename_from_params(row['Parameters'], 300))
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     analyzer.full_stack(save_path)
@@ -46,7 +46,7 @@ print(top_5_r2)
 for i, row in top_5_r2.iterrows():
     model = load_or_train_model(os.path.join(cur, 'outputs/models/vae'), row['Parameters'], train_data, epochs=300)
     analyzer = VAEModelAnalyzer(model, data, row['Latent Dimensions'], feat_labels)
-    save_path = os.path.join(cur, 'outputs/analysis/r2', get_filename_from_params(row['Parameters'], 300))
+    save_path = os.path.join(cur, 'outputs/analysis/r2_v2', get_filename_from_params(row['Parameters'], 300))
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     analyzer.full_stack(save_path)
@@ -58,7 +58,7 @@ print(top_5_kl)
 for i, row in top_5_kl.iterrows():
     model = load_or_train_model(os.path.join(cur, 'outputs/models/vae'), row['Parameters'], train_data, epochs=300)
     analyzer = VAEModelAnalyzer(model, data, row['Latent Dimensions'], feat_labels)
-    save_path = os.path.join(cur, 'outputs/analysis/kl', get_filename_from_params(row['Parameters'], 300))
+    save_path = os.path.join(cur, 'outputs/analysis/kl_v2', get_filename_from_params(row['Parameters'], 300))
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     analyzer.full_stack(save_path)

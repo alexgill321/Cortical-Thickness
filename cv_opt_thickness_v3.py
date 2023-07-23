@@ -33,16 +33,12 @@ cv = VAECrossValidator(param_grid, input_dim, 5, batch_size=128, save_path=save_
 
 #%% Running the Cross Validation
 results = cv.cross_validate_df_val(train_data, val_data, epochs=epochs, verbose=0)
-with open('outputs/CrossVal/cv_thickness_v5.pkl', 'wb') as file:
+with open('outputs/CrossVal/cv_thickness_norm.pkl', 'wb') as file:
     pickle.dump(results, file)
 
 #%%
-with open('outputs/CrossVal/cv_thickness_v5.pkl', 'rb') as file:
+with open('outputs/CrossVal/cv_thickness_norm.pkl', 'rb') as file:
     results = pickle.load(file)
-
-#%% Save modified results
-with open('outputs/CrossVal/cv_thickness_v5.pkl', 'wb') as file:
-    pickle.dump(results, file)
 
 #%% Defining the Heatmap Function
 
@@ -91,7 +87,7 @@ g.map_dataframe(create_heatmap_recon)
 g.set_axis_labels('Latent Dimensions', 'Beta')
 
 # Save the plot
-plt.savefig(save_path + 'heatmap_recon_loss_v5.png')
+plt.savefig(save_path + 'heatmap_recon_loss_v6.png')
 
 #%% Visualizing the Results for the KL Loss
 
@@ -111,7 +107,7 @@ g.map_dataframe(create_heatmap_kl)
 g.set_axis_labels('Latent Dimensions', 'Beta')
 
 # Save the plot
-plt.savefig(save_path + 'heatmap_kl_loss_v5.png')
+plt.savefig(save_path + 'heatmap_kl_loss_v6.png')
 
 #%% Visualizing the Results for the R2
 
@@ -131,7 +127,7 @@ g.map_dataframe(create_heatmap_r2)
 g.set_axis_labels('Latent Dimensions', 'Beta')
 
 # Save the plot
-plt.savefig(save_path + 'heatmap_r2_v5.png')
+plt.savefig(save_path + 'heatmap_r2_v6.png')
 
 #%% Visualizing the Results for the Total Loss
 
@@ -150,7 +146,7 @@ g.map_dataframe(create_heatmap_total)
 g.set_axis_labels('Latent Dimensions', 'Beta')
 
 # Save the plot
-plt.savefig(save_path + 'heatmap_total_loss_v5.png')
+plt.savefig(save_path + 'heatmap_total_loss_v6.png')
 
 #%% Visualizing the Results for the Reconstruction Loss
 save_path = 'outputs/Images/CVAnalysis/'
@@ -206,4 +202,4 @@ g.set_titles(col_template="beta = {col_name}", row_template="h_dim = {row_name}"
 
 g.add_legend()
 
-g.savefig(save_path + 'val_kl_loss_v5.png')
+g.savefig(save_path + 'val_kl_loss_v6.png')
