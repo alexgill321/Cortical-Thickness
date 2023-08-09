@@ -22,18 +22,21 @@ val_data_batched = val_data.batch(val_batch_size)
 input_dim = train_data.element_spec[0].shape[0]
 
 #%% Defining the Cross Validation
-latent_dims = [3, 4, 5, 10, 15, 20]
-beta = [0.001, 0.005, 0.01]
-hidden_dims = [[150, 100], [200, 150], [150, 150], [200, 200], [200, 100], [300, 150], [300, 200]]
+#latent_dims = [3, 4, 5, 10, 15, 20]
+#beta = [0.001, 0.005, 0.01]
+#hidden_dims = [[150, 100], [200, 150], [150, 150], [200, 200], [200, 100], [300, 150], [300, 200]]
 dropout = [0.2]
 epochs = 300
+latent_dims = [20]
+beta = [0.0001]
+hidden_dims = [[100, 100]]
 
 param_grid = create_param_grid(hidden_dims, latent_dims, dropout, ['relu'], ['glorot_uniform'], betas=beta)
 cv = VAECrossValidator(param_grid, input_dim, 5, batch_size=128, save_path=save_path)
 
 #%% Running the Cross Validation
-results = cv.cross_validate_df_val(train_data, val_data, epochs=epochs, verbose=0)
-with open('outputs/CrossVal/cv_thickness_norm.pkl', 'wb') as file:
+results = cv.cross_validate_df(train_data, epochs=epochs, verbose=1)
+with open('outputs/CrossVal/cv_thickness_test.pkl', 'wb') as file:
     pickle.dump(results, file)
 
 #%%

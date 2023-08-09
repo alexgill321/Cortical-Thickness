@@ -146,7 +146,7 @@ class VAE(keras.Model):
             **kwargs
     ):
         super(VAE, self).compile(**kwargs)
-        self.optimizer = optimizer or tf.keras.optimizers.Adam(learning_rate=1e-3)
+        self.optimizer = optimizer or tf.keras.optimizers.Adam(learning_rate=1e-4)
         self.reconstruction_loss_fn = reconstruction_loss_fn
         self.kl_loss_fn = kl_loss_fn
 

@@ -23,15 +23,12 @@ def visualize_latent_space(vae, data, labels=None, savefile=None):
         savefile (optional): The path to the file to save the visualization to
     """
 
-    # 1. Encode input samples
     z_mean, z_log_var, z, _ = vae(data)
     z = z.numpy()
 
-    # 2. Apply t-SNE
     tsne = TSNE(random_state=42)
     z_2d = tsne.fit_transform(z)
 
-    # 3. Create a scatter plot
     fig = plt.figure(figsize=(8, 6))
     if labels is None:
         sns.scatterplot(x=z_2d[:, 0], y=z_2d[:, 1], alpha=0.6)
@@ -43,6 +40,7 @@ def visualize_latent_space(vae, data, labels=None, savefile=None):
     if savefile is not None:
         plt.savefig(savefile)
     plt.close()
+    return fig
 
 
 def visualize_latent_space_multiple(vae_models, data, labels, savefile=None):
@@ -73,6 +71,7 @@ def visualize_latent_space_multiple(vae_models, data, labels, savefile=None):
     if savefile is not None:
         plt.savefig(savefile)
     plt.close()
+    return fig
 
 
 def latent_clustering(vae, data, num_clusters, savefile=None):
@@ -87,29 +86,21 @@ def latent_clustering(vae, data, num_clusters, savefile=None):
         num_clusters: The number of clusters to use for the KMeans clustering
         savefile (optional): The path to the file to save the visualization to
 
-    Returns:
-        labels: The cluster labels for each sample in the data
+    Returns: The figure and the cluster labels
     """
-    # Assuming X is your high dimensional data.
-
-    # 1. Encode input samples
     z_mean, z_log_var, z, _ = vae(data)
     z = z.numpy()
 
-    # Apply KMeans clustering
     kmeans = KMeans(n_clusters=num_clusters, n_init='auto', random_state=42)
     kmeans.fit(z)
     labels = kmeans.labels_
 
-    # Apply t-SNE to reduce dimensionality to 2D
     tsne = TSNE(n_components=2, random_state=0)
     z_2d = tsne.fit_transform(z)
 
-    # Create a DataFrame that will be used for plotting
     df = pd.DataFrame(z_2d, columns=['Component 1', 'Component 2'])
     df['Cluster'] = labels
 
-    # Plot the results using Seaborn
     fig = plt.figure(figsize=(8, 6))
     sns.scatterplot(data=df, x='Component 1', y='Component 2', hue='Cluster',
                     palette=sns.color_palette('hsv', num_clusters))
@@ -117,7 +108,7 @@ def latent_clustering(vae, data, num_clusters, savefile=None):
     if savefile is not None:
         plt.savefig(savefile)
     plt.close()
-    return labels
+    return fig, labels
 
 
 def plot_latent_dimensions(vae, data, z_dim, savefile=None):
@@ -143,7 +134,15 @@ def plot_latent_dimensions(vae, data, z_dim, savefile=None):
 
     for i in range(z_dim):
         sns.histplot(z[:, i], ax=axs[i], kde=True, color='blue', alpha=0.6, bins=20)
-        axs[i].set_title(f"Latent dimension {i+1}")
+        mu, std = stats.norm.fit(z[:, i])
+        t_stat, p_val = stats.ttest_1samp(z[:, i], 0)
+        if p_val < 0.05:
+            axs[i].axvline(x=mu, color='red', linestyle='--', linewidth=3, label=f"Zero Mean")
+        else:
+            axs[i].axvline(x=mu, color='green', linestyle='--', linewidth=3, label=f"Zero Mean")
+        axs[i].legend()
+        axs[i].set_title(f"Dimension {i+1}: p={p_val:.2f}")
+        axs[i].axis('off')
 
     for i in range(z_dim, len(axs)):
         fig.delaxes(axs[i])
@@ -152,6 +151,7 @@ def plot_latent_dimensions(vae, data, z_dim, savefile=None):
     if savefile is not None:
         plt.savefig(savefile)
     plt.close()
+    return fig
 
 
 def plot_latent_dimensions_multiple(vae_models, data, z_dim, labels, savefile=None):
@@ -173,7 +173,6 @@ def plot_latent_dimensions_multiple(vae_models, data, z_dim, labels, savefile=No
     fig, axs = plt.subplots(n_rows, n_cols, figsize=(15, 15))
     axs = axs.flatten()
 
-    # Store the latent vectors for each model
     zs = []
     for vae in vae_models:
         z_mean, z_log_var, z, _ = vae(data)
@@ -192,6 +191,7 @@ def plot_latent_dimensions_multiple(vae_models, data, z_dim, labels, savefile=No
     if savefile is not None:
         plt.savefig(savefile)
     plt.close()
+    return fig
 
 
 def visualize_top_clusters(vae, data, num_clusters, top_k, savefile=None):
@@ -228,25 +228,20 @@ def visualize_top_clusters(vae, data, num_clusters, top_k, savefile=None):
         top_indexes = np.where(cluster_labels == idx)[0]
         top_cluster_indices.append(top_indexes)
 
-    # 1. Encode input samples
     z_mean, z_log_var, z, _ = vae(data)
     z = z.numpy()
 
-    # 2. Apply t-SNE
     tsne = TSNE(random_state=42)
     z_2d = tsne.fit_transform(z)
 
-    # 3. Create the labels for the clusters
     color_labels = np.zeros(z_2d.shape[0])
     for i in range(len(top_cluster_indices)):
         color_labels[top_cluster_indices[i]] = i + 1
 
-    # 4. Create a scatter plot
-    plt.figure(figsize=(8, 6))
-    color_palette = ["gray"] + sns.color_palette('hsv', len(set(color_labels)) - 1)  # use "gray" for ungrouped data
+    fig = plt.figure(figsize=(8, 6))
+    color_palette = ["gray"] + sns.color_palette('hsv', len(set(color_labels)) - 1)
     sns.scatterplot(x=z_2d[:, 0], y=z_2d[:, 1], hue=color_labels, alpha=0.6, palette=color_palette, legend=False)
 
-    # 5. Create legend
     patch_list = []
     for i in range(int(np.max(color_labels)) + 1):
         if i == 0:
@@ -262,6 +257,7 @@ def visualize_top_clusters(vae, data, num_clusters, top_k, savefile=None):
     if savefile is not None:
         plt.savefig(savefile)
     plt.close()
+    return fig
 
 
 def visualize_latent_influence(vae, data, z_dim, savefile=None):
@@ -308,8 +304,7 @@ def visualize_latent_influence(vae, data, z_dim, savefile=None):
     fig, ax = plt.subplots(figsize=(10, 6))
 
     # Visualize the mean error for each dimension in a bar chart
-    ax.bar(range(z_dim), mean_errors, tick_label=[f'Dim {i+1}' for i in range(z_dim)])
-    ax.set_title('Mean Reconstruction Error for each Latent Dimension')
+    ax.bar(range(z_dim), mean_errors, tick_label=[f'{i+1}' for i in range(z_dim)])
     ax.set_xlabel('Latent Dimension')
     ax.set_ylabel('Mean Error')
 
@@ -319,6 +314,7 @@ def visualize_latent_influence(vae, data, z_dim, savefile=None):
 
     plt.tight_layout()
     plt.close()
+    return fig
 
 
 def visualize_latent_interpolation(vae, data, z_dim, feat_labels, num_features=10, savefile=None):
@@ -376,7 +372,7 @@ def visualize_latent_interpolation(vae, data, z_dim, feat_labels, num_features=1
     # Create a figure for visualization
     fig, axs = plt.subplots(ncols=n_cols, nrows=n_rows, figsize=(20, num_features * 2))
     axs = axs.flatten()
-    # Visualize the mean error for each dimension in a pie chart
+    # Visualize the mean error for each dimension in a bar chart
     for j in range(num_features):
         axs[j].bar(range(z_dim), feature_errors[j], tick_label=[f'{i+1}' for i in range(z_dim)])
         axs[j].set_title(f'{feat_labels[selected_features[j]]}')
@@ -391,6 +387,7 @@ def visualize_latent_interpolation(vae, data, z_dim, feat_labels, num_features=1
         plt.savefig(savefile)
 
     plt.close()
+    return fig, selected_features
 
 
 def visualize_errors_hist(vae, data, savefile=None):
@@ -435,7 +432,7 @@ def visualize_errors_hist(vae, data, savefile=None):
     x = np.linspace(xmin, xmax, 100)
     p = stats.norm.pdf(x, mu, std)
     ax.plot(x, p, 'k', linewidth=2)
-    title = "Fit results: mu = %.2f,  std = %.2f" % (mu, std)
+    title = "μ = %.2f,  σ = %.2f" % (mu, std)
     ax.set_title(title)
 
     t_stat, p_val = stats.ttest_1samp(mean_errors, 0)
@@ -452,6 +449,7 @@ def visualize_errors_hist(vae, data, savefile=None):
         plt.savefig(savefile)
 
     plt.close()
+    return fig
 
 
 def calc_feature_errors(vae, data, feat_labels, savefile=None):

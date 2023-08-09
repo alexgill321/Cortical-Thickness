@@ -208,7 +208,7 @@ class VAECrossValidator:
                     metrics = pickle.load(f)
             else:
                 print(f"\nTraining model with parameters {params}")
-                for i in tqdm(range(self.kf.n_splits), desc="Fold Progress", ncols=80):
+                for i in tqdm(range(self.kf.n_splits), desc="Fold Progress"):
                     if verbose > 0:
                         print(f"Creating new model for parameters {params}")
                     encoder = create_vae_encoder(input_dim=self.input_dim, **params['encoder'])
@@ -345,6 +345,7 @@ class VAECrossValidator:
         data = train_data.shuffle(10000).batch(self.batch_size)
         val_data = val_data.batch(val_data.cardinality().numpy())
         for params in self.param_grid:
+            vae = None
             new_row = {}
             filename = get_filename_from_params(params, epochs)
             save_dir = os.path.join(self.save_path, filename)
@@ -369,7 +370,7 @@ class VAECrossValidator:
                     new_row = pickle.load(f)
             else:
                 print(f"\nTraining model with parameters {params}")
-                for i in tqdm(range(self.kf.n_splits), desc="Fold Progress", ncols=80):
+                for i in tqdm(range(self.kf.n_splits), desc="Fold Progress"):
                     if verbose > 0:
                         print(f"Creating new model for parameters {params}")
                     encoder = create_vae_encoder(input_dim=self.input_dim, **params['encoder'])

@@ -16,8 +16,10 @@ from utils import generate_data_thickness_only, generate_feature_names
 from modelUtils.lr_utils import MultiOptimizerLearningRateScheduler, CyclicLR, ExponentialDecayScheduler
 from modelUtils.vae_utils import train_val_vae, create_vae, VAECrossValidator, save_vae, load_vae, \
     get_filename_from_params, create_param_grid
+import vis_utils as vu
 import shutil
 from vaeModelAnalyzer import VAEModelAnalyzer
+import matplotlib.pyplot as plt
 
 
 class TestVAEModel(unittest.TestCase):
@@ -468,6 +470,141 @@ class TestVAEAnalyzer(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(save_path, 'latent_influence.png')))
         self.assertTrue(os.path.exists(os.path.join(save_path, 'errors_hist.png')))
         self.assertTrue(os.path.exists(os.path.join(save_path, 'feature_errors.csv')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'full_stack.png')))
+        shutil.rmtree(save_path)
+
+
+class TestVAEVisUtils(unittest.TestCase):
+    def setUp(self):
+        cur = os.getcwd()
+        filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
+        train_data, val_data, test_data, self.feat_labels = generate_data_thickness_only(filepath)
+        input_dim = train_data.element_spec[0].shape[0]
+        h_dim = [100, 100]
+        val_batch_size = val_data.cardinality().numpy()
+        val_data_batched = val_data.batch(val_batch_size)
+        self.data = next(iter(val_data_batched))
+        self.z_dim = 15
+        encoder = create_vae_encoder(input_dim, h_dim, self.z_dim)
+        decoder = create_vae_decoder(self.z_dim, h_dim, input_dim)
+        vae = VAE(encoder, decoder)
+        vae.compile()
+        vae.fit(train_data.batch(128), epochs=10, verbose=0)
+        self.model = vae
+
+    def test_plot_latent_space(self):
+        save_path = os.path.join(os.getcwd(), '../outputs/analysis/test/')
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        save_file = os.path.join(save_path, 'latent_space.png')
+        fig = vu.visualize_latent_space(self.model, self.data, savefile=save_file)
+        self.assertTrue(os.path.exists(save_file))
+        self.assertTrue(fig is not None)
+        self.assertTrue(isinstance(fig, plt.Figure))
+        ax = fig.axes[0]
+        self.assertTrue(ax.get_xlabel() == "t-SNE 1")
+        self.assertTrue(ax.get_ylabel() == "t-SNE 2")
+        shutil.rmtree(save_path)
+
+    def test_plot_latent_dimensions(self):
+        save_path = os.path.join(os.getcwd(), '../outputs/analysis/test/')
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        save_file = os.path.join(save_path, 'latent_dimensions.png')
+        fig = vu.plot_latent_dimensions(self.model, self.data, self.z_dim, savefile=save_file)
+        self.assertTrue(os.path.exists(save_file))
+        self.assertTrue(fig is not None)
+        self.assertTrue(isinstance(fig, plt.Figure))
+        self.assertTrue(len(fig.axes) == self.z_dim)
+
+        shutil.rmtree(save_path)
+
+    def test_latent_clustering(self):
+        save_path = os.path.join(os.getcwd(), '../outputs/analysis/test/')
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        save_file = os.path.join(save_path, 'clustered.png')
+        fig, labels = vu.latent_clustering(self.model, self.data, 5, savefile=save_file)
+        self.assertTrue(os.path.exists(save_file))
+        self.assertTrue(fig is not None)
+        self.assertTrue(isinstance(fig, plt.Figure))
+        ax = fig.axes[0]
+        self.assertTrue(ax.get_xlabel() == "Component 1")
+        self.assertTrue(ax.get_ylabel() == "Component 2")
+        self.assertTrue(len(labels) == self.data[0].shape[0])
+
+        shutil.rmtree(save_path)
+
+    def test_visualize_top_clusters(self):
+        save_path = os.path.join(os.getcwd(), '../outputs/analysis/test/')
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        save_file = os.path.join(save_path, 'top_5_clusters.png')
+        fig = vu.visualize_top_clusters(self.model, self.data, 30, 5, savefile=save_file)
+        self.assertTrue(os.path.exists(save_file))
+        self.assertTrue(fig is not None)
+        self.assertTrue(isinstance(fig, plt.Figure))
+        ax = fig.axes[0]
+        self.assertTrue(ax.get_xlabel() == "t-SNE 1")
+        self.assertTrue(ax.get_ylabel() == "t-SNE 2")
+        labels = ax.get_legend().get_texts()
+        self.assertTrue(len(labels) == 6)
+        self.assertTrue(labels[0].get_text() == 'un-clustered')
+        self.assertTrue(labels[1].get_text() == 'cluster 1')
+        self.assertTrue(labels[2].get_text() == 'cluster 2')
+        self.assertTrue(labels[3].get_text() == 'cluster 3')
+        self.assertTrue(labels[4].get_text() == 'cluster 4')
+        self.assertTrue(labels[5].get_text() == 'cluster 5')
+
+        shutil.rmtree(save_path)
+
+    def test_visualize_latent_influence(self):
+        save_path = os.path.join(os.getcwd(), '../outputs/analysis/test/')
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        save_file = os.path.join(save_path, 'latent_influence.png')
+        fig = vu.visualize_latent_influence(self.model, self.data, self.z_dim, savefile=save_file)
+        self.assertTrue(os.path.exists(save_file))
+        self.assertTrue(fig is not None)
+        self.assertTrue(isinstance(fig, plt.Figure))
+        ax = fig.axes[0]
+        self.assertTrue(ax.get_xlabel() == "Latent Dimension")
+        self.assertTrue(ax.get_ylabel() == "Mean Error")
+        self.assertTrue(len(ax.get_xticklabels()) == self.z_dim)
+
+        shutil.rmtree(save_path)
+
+    def test_visualize_latent_interpolation(self):
+        save_path = os.path.join(os.getcwd(), '../outputs/analysis/test/')
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        save_file = os.path.join(save_path, 'latent_interpolation.png')
+        fig, selected_features = vu.visualize_latent_interpolation(self.model, self.data, self.z_dim, self.feat_labels,
+                                                                   num_features=6, savefile=save_file)
+        self.assertTrue(os.path.exists(save_file))
+        self.assertTrue(fig is not None)
+        self.assertTrue(isinstance(fig, plt.Figure))
+        for i in range(6):
+            ax = fig.axes[i]
+            self.assertTrue(ax.get_xlabel() == "Latent Dimension")
+            self.assertTrue(ax.get_ylabel() == "Mean Error")
+            self.assertTrue(ax.get_title() == f"{self.feat_labels[selected_features[i]]}")
+            self.assertTrue(len(ax.get_xticklabels()) == self.z_dim)
+        shutil.rmtree(save_path)
+
+    def test_visualize_errors_hist(self):
+        save_path = os.path.join(os.getcwd(), '../outputs/analysis/test/')
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        save_file = os.path.join(save_path, 'errors_hist.png')
+        fig = vu.visualize_errors_hist(self.model, self.data, savefile=save_file)
+        self.assertTrue(os.path.exists(save_file))
+        self.assertTrue(fig is not None)
+        self.assertTrue(isinstance(fig, plt.Figure))
+        ax = fig.axes[0]
+        self.assertTrue(ax.get_xlabel() == "Mean Error")
+        self.assertTrue(ax.get_ylabel() == "Density")
+        self.assertTrue(len(ax.get_legend().get_texts()) == 1)
         shutil.rmtree(save_path)
 
 

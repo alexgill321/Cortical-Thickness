@@ -2,6 +2,8 @@ import vis_utils as vu
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_samples
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.image import imread
 import tensorflow as tf
 
 
@@ -45,25 +47,53 @@ class VAEModelAnalyzer:
 
         # P1
         vu.visualize_latent_space(self.model, self.data, savefile=save_path + '/latent_space.png')
-        vu.plot_latent_dimensions(self.model, self.data, z_dim=self.z, savefile=save_path + '/latent_dimensions.png')
+        vu.plot_latent_dimensions(self.model, self.data, z_dim=self.z,
+                                         savefile=save_path + '/latent_dimensions.png')
 
         # P2
         vu.visualize_top_clusters(self.model, self.data, num_clusters=30, top_k=5,
-                                  savefile=save_path + '/top_5_clusters.png')
+                                         savefile=save_path + '/top_5_clusters.png')
 
         # P3
-        vu.visualize_latent_interpolation(self.model, self.data, feat_labels=self.feat_labels, z_dim=self.z,
-                                          savefile=save_path + '/latent_interpolation.png')
-        vu.visualize_latent_influence(self.model, self.data, z_dim=self.z, savefile=save_path + '/latent_influence.png')
+        vu.visualize_latent_interpolation(self.model, self.data, feat_labels=self.feat_labels,
+                                                        z_dim=self.z, savefile=save_path + '/latent_interpolation.png')
+        vu.visualize_latent_influence(self.model, self.data, z_dim=self.z,
+                                             savefile=save_path + '/latent_influence.png')
 
         # P4
         rec_data = tf.data.Dataset.from_tensor_slices(self.data)
         batched_data = rec_data.batch(rec_data.cardinality().numpy())
         _, self.model_results["R2"], _, _ = self.model.evaluate(batched_data)
-        vu.visualize_errors_hist(self.model, self.data, savefile=save_path + '/errors_hist.png')
+        vis6 = vu.visualize_errors_hist(self.model, self.data, savefile=save_path + '/errors_hist.png')
         self.model_results["Feature Errors"] = vu.calc_feature_errors(self.model, self.data,
                                                                       feat_labels=self.feat_labels,
                                                                       savefile=save_path + '/feature_errors.csv')
+
+        # Full Stack Visualization
+        fig, axs = plt.subplots(3, 2, figsize=(15, 20))
+        axs = axs.flatten()
+        axs[0].imshow(imread(save_path + '/latent_space.png'))
+        axs[0].set_title('Latent Space')
+        axs[0].axis('off')
+        axs[1].imshow(imread(save_path + '/latent_dimensions.png'))
+        axs[1].set_title('Latent Dimensions')
+        axs[1].axis('off')
+        axs[2].imshow(imread(save_path + '/top_5_clusters.png'))
+        axs[2].set_title('Top 5 Validation Clusters in Latent Space')
+        axs[2].axis('off')
+        axs[3].imshow(imread(save_path + '/latent_interpolation.png'))
+        axs[3].set_title('Latent Influence on Reconstruction Features')
+        axs[3].axis('off')
+        axs[4].imshow(imread(save_path + '/latent_influence.png'))
+        axs[4].set_title('Mean Latent Influence')
+        axs[4].axis('off')
+        axs[5].imshow(imread(save_path + '/errors_hist.png'))
+        axs[5].set_title('Reconstruction Error Histogram')
+        axs[5].axis('off')
+        plt.tight_layout()
+
+        plt.savefig(save_path + '/full_stack.png')
+        plt.close()
 
 
 
