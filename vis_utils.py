@@ -21,6 +21,8 @@ def visualize_latent_space(vae, data, labels=None, savefile=None):
         data: A single batch of data to be used for the analysis
         labels (optional): A list of labels for the data
         savefile (optional): The path to the file to save the visualization to
+
+    Returns: The figure
     """
 
     z_mean, z_log_var, z, _ = vae(data)
@@ -54,6 +56,8 @@ def visualize_latent_space_multiple(vae_models, data, labels, savefile=None):
         data: A single batch of data to be used for the analysis
         labels: A list of labels for the data
         savefile (optional): The path to the file to save the visualization to
+
+    Returns: The figure
     """
     fig = plt.figure(figsize=(8, 6))
     for i in range(len(vae_models)):
@@ -122,6 +126,8 @@ def plot_latent_dimensions(vae, data, z_dim, savefile=None):
         data: A single batch of data to be used for the analysis
         z_dim: The dimensionality of the latent space
         savefile (optional): The path to the file to save the visualization to
+
+    Returns: The figure
     """
     n_cols = 3
     n_rows = int(np.ceil(z_dim / n_cols))
@@ -166,6 +172,8 @@ def plot_latent_dimensions_multiple(vae_models, data, z_dim, labels, savefile=No
         z_dim: The dimensionality of the latent space
         labels: A list of labels for the data
         savefile (optional): The path to the file to save the visualization to
+
+    Returns: The figure
     """
     n_cols = 3
     n_rows = int(np.ceil(z_dim / n_cols))
@@ -210,6 +218,8 @@ def visualize_top_clusters(vae, data, num_clusters, top_k, savefile=None):
         num_clusters: The number of clusters used for the KMeans clustering
         top_k: The number of top clusters to visualize
         savefile (optional): The path to the file to save the visualization to
+
+    Returns: The figure
     """
     k_mean = KMeans(num_clusters, n_init='auto', random_state=42)
     cluster_labels = k_mean.fit_predict(data[0])
@@ -275,6 +285,8 @@ def visualize_latent_influence(vae, data, z_dim, savefile=None):
         data: A single batch of data to be used for the analysis
         z_dim: The number of dimensions in the latent space
         savefile (optional): The path to the file to save the visualization to
+
+    Returns: The figure
     """
     # 1. Encode input samples
     z_mean, z_log_var, z, original_recon = vae(data)
@@ -335,6 +347,8 @@ def visualize_latent_interpolation(vae, data, z_dim, feat_labels, num_features=1
         feat_labels: A list of the feature labels for the features being analyzed
         num_features: The number of features to analyze
         savefile (optional): The path to the file to save the visualization to
+
+    Returns: The figure and a list of the selected features
     """
     # 1. Encode input samples
     z_mean, z_log_var, z, original_recon = vae(data)
@@ -485,6 +499,47 @@ def calc_feature_errors(vae, data, feat_labels, savefile=None):
         df.to_csv(savefile, index=False)
 
     return df
+
+
+def plot_training_results_hist(hist, save_path):
+    plt.figure()
+    plt.plot(hist.history['reconstruction_loss'], label='Training Loss')
+    plt.plot(hist.history['val_reconstruction_loss'], label='Validation Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.savefig(save_path + '/recon_loss_hist.png')
+
+    plt.figure()
+    plt.plot(hist.history['kl_loss'], label='Training Loss')
+    plt.plot(hist.history['val_kl_loss'], label='Validation Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.savefig(save_path + '/kl_loss_hist.png')
+
+    plt.close()
+
+
+def plot_training_results_cv(cv_results, save_path):
+    plt.figure()
+    plt.plot(cv_results['Training Reconstruction Loss History'], label='Training Loss')
+    plt.plot(cv_results['Validation Reconstruction Loss History'], label='Validation Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.savefig(save_path + '/recon_loss_cv.png')
+
+    plt.figure()
+    plt.plot(cv_results['Training KL Loss History'], label='Training Loss')
+    plt.plot(cv_results['Validation KL Loss History'], label='Validation Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.savefig(save_path + '/kl_loss_cv.png')
+
+    plt.close()
+
 
 
 #%%

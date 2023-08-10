@@ -15,7 +15,7 @@ import os
 from utils import generate_data_thickness_only, generate_feature_names
 from modelUtils.lr_utils import MultiOptimizerLearningRateScheduler, CyclicLR, ExponentialDecayScheduler
 from modelUtils.vae_utils import train_val_vae, create_vae, VAECrossValidator, save_vae, load_vae, \
-    get_filename_from_params, create_param_grid
+    get_filename_from_params, create_param_grid, load_or_train_model
 import vis_utils as vu
 import shutil
 from vaeModelAnalyzer import VAEModelAnalyzer
@@ -443,10 +443,11 @@ class TestVAEAnalyzer(unittest.TestCase):
         decoder = create_vae_decoder(self.z_dim, h_dim, input_dim)
         vae = VAE(encoder, decoder)
         vae.compile()
-        vae.fit(train_data.batch(batch_size), epochs=epochs, verbose=1)
-        self.model = vae
         val_batch_size = val_data.cardinality().numpy()
         val_data_batched = val_data.batch(val_batch_size)
+        self.train_data = train_data.batch(batch_size)
+        self.hist = vae.fit(self.train_data, epochs=epochs, validation_data=val_data_batched, verbose=1)
+        self.model = vae
         self.data = next(iter(val_data_batched))
 
     def test_create_analyzer(self):
@@ -471,6 +472,44 @@ class TestVAEAnalyzer(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(save_path, 'errors_hist.png')))
         self.assertTrue(os.path.exists(os.path.join(save_path, 'feature_errors.csv')))
         self.assertTrue(os.path.exists(os.path.join(save_path, 'full_stack.png')))
+        shutil.rmtree(save_path)
+
+    def test_full_stack_hist(self):
+        analyzer = VAEModelAnalyzer(self.model, self.data, self.z_dim, self.feat_labels, hist=self.hist)
+        save_path = os.path.join(os.getcwd(), '../outputs/models/vae/test')
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        analyzer.full_stack(save_path)
+        self.assertTrue(os.path.exists(save_path))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'latent_space.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'latent_dimensions.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'top_5_clusters.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'latent_interpolation.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'latent_influence.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'errors_hist.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'feature_errors.csv')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'full_stack.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'recon_loss_hist.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'kl_loss_hist.png')))
+
+    def test_full_stack_cv(self):
+        save_path = os.path.join(os.getcwd(), '../outputs/models/vae/test')
+        results = generate_simple_cv(save_path)
+        res = results.loc[0]
+        model = load_or_train_model(save_path, res['Parameters'], self.train_data, 10)
+        analyzer = VAEModelAnalyzer(model, self.data, 15, self.feat_labels, cv_results=res)
+        analyzer.full_stack(save_path)
+        self.assertTrue(os.path.exists(save_path))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'latent_space.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'latent_dimensions.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'top_5_clusters.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'latent_interpolation.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'latent_influence.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'errors_hist.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'feature_errors.csv')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'full_stack.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'recon_loss_cv.png')))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'kl_loss_cv.png')))
         shutil.rmtree(save_path)
 
 
@@ -608,5 +647,20 @@ class TestVAEVisUtils(unittest.TestCase):
         shutil.rmtree(save_path)
 
 
+def generate_simple_cv(save_path):
+    cur = os.getcwd()
+    filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
+    train_data, val_data, test_data, feat_labels = generate_data_thickness_only(filepath)
+    input_dim = train_data.element_spec[0].shape[0]
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    param_grid = create_param_grid([[100, 100]], [15], [0.2], ['relu'], ['glorot_uniform'], betas=[.001])
+    cv = VAECrossValidator(param_grid, input_dim, k_folds=5, save_path=save_path)
+    results = cv.cross_validate_df_val(train_data, epochs=10, val_data=val_data)
+    return results
+
+
 if __name__ == '__main__':
     unittest.main()
+
+#%%

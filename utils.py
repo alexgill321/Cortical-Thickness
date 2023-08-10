@@ -32,8 +32,8 @@ def generate_data(filepath):
     scaler = StandardScaler()
     train_x_norm = scaler.fit_transform(train_x)
     test_x_norm = scaler.transform(test_x)
-    train_y = y_data[condition_indices, :]
-    test_y = y_data[~db.index.isin(condition_indices), :]
+    train_y = train_x_norm
+    test_y = test_x_norm
 
     return train_x_norm, train_y, test_x_norm, test_y
 

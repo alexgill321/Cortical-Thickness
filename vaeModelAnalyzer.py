@@ -27,15 +27,16 @@ class VAEModelAnalyzer:
         data: A single batch of validation data to be used for the analysis
         z: The dimensionality of the latent space
         feat_labels: The labels of the features in the data
-        model_info (optional): A dictionary containing information about the model, such as the hyperparameters used
+        hist: (optional) The training history of the model
         model_results: A dictionary containing the metric results of the analysis
     """
-    def __init__(self, model, data, z, feat_labels, model_info=None):
+    def __init__(self, model, data, z, feat_labels, hist=None, cv_results=None):
         self.model = model
         self.data = data
         self.z = z
         self.feat_labels = feat_labels
-        self.model_info = model_info
+        self.hist = hist
+        self.cv_results = cv_results
         self.model_results = {}
 
     def full_stack(self, save_path):
@@ -47,31 +48,49 @@ class VAEModelAnalyzer:
 
         # P1
         vu.visualize_latent_space(self.model, self.data, savefile=save_path + '/latent_space.png')
-        vu.plot_latent_dimensions(self.model, self.data, z_dim=self.z,
-                                         savefile=save_path + '/latent_dimensions.png')
+        vu.plot_latent_dimensions(self.model, self.data, z_dim=self.z, savefile=save_path + '/latent_dimensions.png')
 
         # P2
         vu.visualize_top_clusters(self.model, self.data, num_clusters=30, top_k=5,
-                                         savefile=save_path + '/top_5_clusters.png')
+                                  savefile=save_path + '/top_5_clusters.png')
 
         # P3
         vu.visualize_latent_interpolation(self.model, self.data, feat_labels=self.feat_labels,
-                                                        z_dim=self.z, savefile=save_path + '/latent_interpolation.png')
-        vu.visualize_latent_influence(self.model, self.data, z_dim=self.z,
-                                             savefile=save_path + '/latent_influence.png')
+                                          z_dim=self.z, savefile=save_path + '/latent_interpolation.png')
+        vu.visualize_latent_influence(self.model, self.data, z_dim=self.z, savefile=save_path + '/latent_influence.png')
 
         # P4
         rec_data = tf.data.Dataset.from_tensor_slices(self.data)
         batched_data = rec_data.batch(rec_data.cardinality().numpy())
         _, self.model_results["R2"], _, _ = self.model.evaluate(batched_data)
-        vis6 = vu.visualize_errors_hist(self.model, self.data, savefile=save_path + '/errors_hist.png')
+        vu.visualize_errors_hist(self.model, self.data, savefile=save_path + '/errors_hist.png')
         self.model_results["Feature Errors"] = vu.calc_feature_errors(self.model, self.data,
                                                                       feat_labels=self.feat_labels,
                                                                       savefile=save_path + '/feature_errors.csv')
 
-        # Full Stack Visualization
-        fig, axs = plt.subplots(3, 2, figsize=(15, 20))
-        axs = axs.flatten()
+        if self.hist is not None:
+            vu.plot_training_results_hist(self.hist, save_path)
+            fig, axs = plt.subplots(4, 2, figsize=(15, 25))
+            axs = axs.flatten()
+            axs[6].imshow(imread(save_path + '/recon_loss_hist.png'))
+            axs[6].set_title('Reconstruction Loss Evolution')
+            axs[6].axis('off')
+            axs[7].imshow(imread(save_path + '/kl_loss_hist.png'))
+            axs[7].set_title('KL Loss Evolution')
+            axs[7].axis('off')
+        elif self.cv_results is not None:
+            vu.plot_training_results_cv(self.cv_results, save_path)
+            fig, axs = plt.subplots(4, 2, figsize=(15, 25))
+            axs = axs.flatten()
+            axs[6].imshow(imread(save_path + '/recon_loss_cv.png'))
+            axs[6].set_title('Avg Reconstruction Loss Evolution')
+            axs[6].axis('off')
+            axs[7].imshow(imread(save_path + '/kl_loss_cv.png'))
+            axs[7].set_title('Avg KL Loss Evolution')
+            axs[7].axis('off')
+        else:
+            fig, axs = plt.subplots(3, 2, figsize=(15, 20))
+            axs = axs.flatten()
         axs[0].imshow(imread(save_path + '/latent_space.png'))
         axs[0].set_title('Latent Space')
         axs[0].axis('off')
