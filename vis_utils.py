@@ -300,7 +300,7 @@ def visualize_latent_influence(vae, data, z_dim, savefile=None):
         # vary the i-th dimension
         z_altered = np.copy(z)
         original_mean = np.mean(z[:, i])
-        increase = 1.5 * original_mean - original_mean
+        increase = 1.2 * original_mean - original_mean
         z_altered[:, i] += increase
 
         # 3. Decode the altered latent space
@@ -367,8 +367,81 @@ def visualize_latent_interpolation(vae, data, z_dim, feat_labels, num_features=1
         # vary the i-th dimension
         z_altered = np.copy(z)
         original_mean = np.mean(z[:, i])
-        increase = 1.5 * original_mean - original_mean
+        increase = 1.2 * original_mean - original_mean
         z_altered[:, i] += increase
+
+        # 3. Decode the altered latent space
+        altered_recon = vae.decoder(z_altered)
+
+        # 4. Compute the error between original and altered
+        error = np.abs(original_recon - altered_recon)
+
+        # Store the mean error for each selected feature
+        for j, feature in enumerate(selected_features):
+            feature_errors[j, i] = np.mean(error[:, feature])
+
+    n_cols = 3
+    n_rows = int(np.ceil(num_features / n_cols))
+
+    # Create a figure for visualization
+    fig, axs = plt.subplots(ncols=n_cols, nrows=n_rows, figsize=(20, num_features * 2))
+    axs = axs.flatten()
+    # Visualize the mean error for each dimension in a bar chart
+    for j in range(num_features):
+        axs[j].bar(range(z_dim), feature_errors[j], tick_label=[f'{i+1}' for i in range(z_dim)])
+        axs[j].set_title(f'{feat_labels[selected_features[j]]}')
+        axs[j].set_xlabel('Latent Dimension')
+        axs[j].set_ylabel('Mean Error')
+
+    # Remove extra axes
+    for i in range(num_features, len(axs)):
+        axs[i].remove()
+
+    if savefile:
+        plt.savefig(savefile)
+
+    plt.close()
+    return fig, selected_features
+
+
+def visualize_latent_interpolation_chaos(vae, data, z_dim, feat_labels, num_features=10, savefile=None):
+    """ Visualize the influence of each dimension in the latent space on individual features
+
+    This function encodes the input data using the vae model, then for each dimension in the latent space it alters the
+    latent vector by increasing the value of that dimension by 50% for each datapoint.
+    The altered latent vector is then decoded and the error between the original and altered input is calculated.
+    The mean error for each dimension is then plotted for each of the features being analyzed.
+
+    The purpose of this visualization is to see which dimensions in the latent space have the most influence on the
+    output of specific features.
+
+    Args:
+        vae: A trained VAE model
+        data: A single batch of data to be used for the analysis
+        z_dim: The number of dimensions in the latent space
+        feat_labels: A list of the feature labels for the features being analyzed
+        num_features: The number of features to analyze
+        savefile (optional): The path to the file to save the visualization to
+
+    Returns: The figure and a list of the selected features
+    """
+    # 1. Encode input samples
+    z_mean, z_log_var, z, original_recon = vae(data)
+    z = z.numpy()
+
+    # Determine the features to visualize
+    # Here we randomly select num_features from the feature space
+    num_total_features = original_recon.shape[-1]
+    selected_features = np.random.choice(num_total_features, num_features, replace=False)
+
+    # Prepare to collect mean errors for each dimension
+    feature_errors = np.zeros((num_features, z_dim))
+
+    # 2. For each dimension in the latent space
+    for i in range(z_dim):
+        # vary the i-th dimension
+        z_altered = np.copy(z)
+        z_altered[:, i] = 1.5 * z[:, i]
 
         # 3. Decode the altered latent space
         altered_recon = vae.decoder(z_altered)

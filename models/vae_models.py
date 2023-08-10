@@ -102,7 +102,7 @@ def r2_score(y_true, y_predicted):
     residual = tf.reduce_sum(tf.square(tf.subtract(y_true, y_predicted)))
     total = tf.reduce_sum(tf.square(tf.subtract(y_true, tf.reduce_mean(y_true))))
     r2 = tf.subtract(1.0, tf.divide(residual, total))
-    return r2
+    return r2, residual, total
 
 
 class VAE(keras.Model):
@@ -174,12 +174,12 @@ class VAE(keras.Model):
         kl_loss = tf.reduce_mean(self.kl_loss_fn(z_mean, z_log_var))
         total_loss = reconstruction_loss + kl_loss
         x = tf.cast(x, dtype=tf.float32)
-        r2 = r2_score(x, x_reconstructed)
+        r2, res, tot = r2_score(x, x_reconstructed)
         return {
             "reconstruction_loss": reconstruction_loss,
             "kl_loss": kl_loss,
             "total_loss": total_loss,
-            "r2": r2
+            "r2": r2,
         }
 
     def call(self, data, training=False, mask=None):

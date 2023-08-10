@@ -55,8 +55,8 @@ class VAEModelAnalyzer:
                                   savefile=save_path + '/top_5_clusters.png')
 
         # P3
-        vu.visualize_latent_interpolation(self.model, self.data, feat_labels=self.feat_labels,
-                                          z_dim=self.z, savefile=save_path + '/latent_interpolation.png')
+        vu.visualize_latent_interpolation_chaos(self.model, self.data, feat_labels=self.feat_labels,
+                                                z_dim=self.z, savefile=save_path + '/latent_interpolation.png')
         vu.visualize_latent_influence(self.model, self.data, z_dim=self.z, savefile=save_path + '/latent_influence.png')
 
         # P4

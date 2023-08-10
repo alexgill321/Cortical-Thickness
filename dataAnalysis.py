@@ -28,7 +28,7 @@ plt.show()
 
 mean = train_x.mean(axis=0)
 std = train_x.std(axis=0)
-
+plt.hist(mean)
 print("Normalized Features")
 # Show the mean and std for each feature
 for i in range(100):
@@ -59,7 +59,7 @@ plt.show()
 
 mean = train_x_no_norm.mean(axis=0)
 std = train_x_no_norm.std(axis=0)
-
+plt.hist(mean)
 # Show the mean and std for each feature
 print("Un-normalized Features")
 for i in range(100):

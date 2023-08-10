@@ -69,11 +69,11 @@ def generate_data_thickness_only(filepath, validation_split=0.2, normalize=False
     test_x = data.loc[~db.index.isin(condition_indices)]
 
     y_data = np.concatenate((one_hot_age, one_hot_sex), axis=1).astype('float32')
-    scaler = StandardScaler()
 
     if normalize:
-        train_x_norm = scaler.fit_transform(train_x)
-        test_x_norm = scaler.transform(test_x)
+        global_mean_train_x = train_x.values.mean()  # Compute global mean across all features
+        train_x_norm = train_x - global_mean_train_x
+        test_x_norm = test_x - global_mean_train_x
     else:
         train_x_norm = train_x.values
         test_x_norm = test_x.values
@@ -114,8 +114,11 @@ def generate_data_thickness_only_analysis(filepath, normalize=False):
     scaler = StandardScaler()
 
     if normalize:
-        train_x_norm = scaler.fit_transform(train_x)
-        test_x_norm = scaler.transform(test_x)
+        global_mean_train_x = train_x.values.mean()  # Compute global mean across all features
+        train_x_norm = train_x - global_mean_train_x
+        test_x_norm = test_x - global_mean_train_x
+        train_x_norm = train_x_norm.values
+        test_x_norm = test_x_norm.values
     else:
         train_x_norm = train_x.values
         test_x_norm = test_x.values
