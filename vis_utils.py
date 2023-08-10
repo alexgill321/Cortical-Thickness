@@ -614,5 +614,40 @@ def plot_training_results_cv(cv_results, save_path):
     plt.close()
 
 
+def visualize_reconstruction_errors(vae, data, num_recon=10, random=False, savefile=None):
+    (x, y) = data
+    z_mean, z_log_var, z, x_reconstruction = vae(data)
+
+    if random:
+        idx = np.random.choice(data.shape[0], num_recon, replace=False)
+    else:
+        idx = np.arange(num_recon)
+
+    fig, axs = plt.subplots(int(np.ceil(num_recon/2)), 2, figsize=(10, 20))
+    axs = axs.flatten()
+
+    for i in range(num_recon):
+        x_data = x[idx[i], :].numpy()
+        x_recon = x_reconstruction[idx[i], :].numpy()
+        sns.scatterplot(x=x_data, y=x_recon, ax=axs[i], alpha=0.6)
+        # plot the diagonal
+        min_val = min(x_data.min(), x_recon.min())
+        max_val = max(x_data.max(), x_recon.max())
+        axs[i].plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--')
+        axs[i].set_title(f"Patient {idx[i]}")
+        axs[i].set_xlabel("Original")
+        axs[i].set_ylabel("Reconstruction")
+
+    for i in range(num_recon, len(axs)):
+        fig.delaxes(axs[i])
+
+    plt.tight_layout()
+
+    if savefile:
+        plt.savefig(savefile)
+
+    plt.close()
+    return fig
+
 
 #%%

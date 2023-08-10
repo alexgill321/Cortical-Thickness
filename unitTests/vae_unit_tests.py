@@ -517,7 +517,7 @@ class TestVAEVisUtils(unittest.TestCase):
     def setUp(self):
         cur = os.getcwd()
         filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-        train_data, val_data, test_data, self.feat_labels = generate_data_thickness_only(filepath)
+        train_data, val_data, test_data, self.feat_labels = generate_data_thickness_only(filepath, normalize=True)
         input_dim = train_data.element_spec[0].shape[0]
         h_dim = [100, 100]
         val_batch_size = val_data.cardinality().numpy()
@@ -644,6 +644,20 @@ class TestVAEVisUtils(unittest.TestCase):
         self.assertTrue(ax.get_xlabel() == "Mean Error")
         self.assertTrue(ax.get_ylabel() == "Density")
         self.assertTrue(len(ax.get_legend().get_texts()) == 1)
+        shutil.rmtree(save_path)
+
+    def test_visualize_reconstruction_errors(self):
+        save_path = os.path.join(os.getcwd(), '../outputs/analysis/test/')
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        save_file = os.path.join(save_path, 'reconstruction_errors.png')
+        fig = vu.visualize_reconstruction_errors(self.model, self.data, savefile=save_file)
+        self.assertTrue(os.path.exists(save_file))
+        self.assertTrue(fig is not None)
+        self.assertTrue(isinstance(fig, plt.Figure))
+        ax = fig.axes[0]
+        self.assertTrue(ax.get_xlabel() == "Original")
+        self.assertTrue(ax.get_ylabel() == "Reconstruction")
         shutil.rmtree(save_path)
 
 

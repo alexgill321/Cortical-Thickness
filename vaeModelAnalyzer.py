@@ -68,6 +68,9 @@ class VAEModelAnalyzer:
                                                                       feat_labels=self.feat_labels,
                                                                       savefile=save_path + '/feature_errors.csv')
 
+        # P5
+        vu.visualize_reconstruction_errors(self.model, self.data, num_recon=6, savefile=save_path + '/recon_errors.png')
+
         if self.hist is not None:
             vu.plot_training_results_hist(self.hist, save_path)
             fig, axs = plt.subplots(4, 2, figsize=(15, 25))
