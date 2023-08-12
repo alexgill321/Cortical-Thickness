@@ -132,7 +132,7 @@ def plot_latent_dimensions(vae, data, z_dim, savefile=None):
     n_cols = 3
     n_rows = int(np.ceil(z_dim / n_cols))
 
-    fig, axs = plt.subplots(n_rows, n_cols, figsize=(15, 15))
+    fig, axs = plt.subplots(n_rows, n_cols, figsize=(15, 6*n_rows))
     axs = axs.flatten()
 
     z_mean, z_log_var, z, _ = vae(data)
@@ -143,11 +143,11 @@ def plot_latent_dimensions(vae, data, z_dim, savefile=None):
         mu, std = stats.norm.fit(z[:, i])
         t_stat, p_val = stats.ttest_1samp(z[:, i], 0)
         if p_val < 0.05:
-            axs[i].axvline(x=mu, color='red', linestyle='--', linewidth=3, label=f"Zero Mean")
+            axs[i].axvline(x=mu, color='red', linestyle='--', linewidth=3, label=f"p={p_val:.2f}")
         else:
-            axs[i].axvline(x=mu, color='green', linestyle='--', linewidth=3, label=f"Zero Mean")
-        axs[i].legend()
-        axs[i].set_title(f"Dimension {i+1}: p={p_val:.2f}")
+            axs[i].axvline(x=mu, color='green', linestyle='--', linewidth=3, label=f"p={p_val:.2f}")
+        axs[i].legend(fontsize=20)
+        axs[i].set_title(f"Dimension {i+1}: μ={mu:.2f}, σ={std:.2f}", fontsize=20)
         axs[i].axis('off')
 
     for i in range(z_dim, len(axs)):
@@ -178,7 +178,7 @@ def plot_latent_dimensions_multiple(vae_models, data, z_dim, labels, savefile=No
     n_cols = 3
     n_rows = int(np.ceil(z_dim / n_cols))
 
-    fig, axs = plt.subplots(n_rows, n_cols, figsize=(15, 15))
+    fig, axs = plt.subplots(n_rows, n_cols, figsize=(15, 5*n_rows))
     axs = axs.flatten()
 
     zs = []

@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 #%%
 filename = os.path.join(os.getcwd(), 'data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-train, test, columns = generate_data_thickness_only_analysis(filename, normalize=True)
+train, test, columns = generate_data_thickness_only_analysis(filename, normalize=False)
 #%%
 (train_x, train_y) = train
 (test_x, test_y) = test
@@ -28,11 +28,14 @@ plt.show()
 
 mean = train_x.mean(axis=0)
 std = train_x.std(axis=0)
+
+total_mean = mean.mean()
+total_std = std.mean()
+print(f"Total mean: {total_mean}")
+print(f"Total std: {total_std}")
 plt.hist(mean)
 print("Normalized Features")
-# Show the mean and std for each feature
-for i in range(100):
-    print(f"{columns[i]}: mean={mean[i]}, std={std[i]}")
+
 
 
 #%%

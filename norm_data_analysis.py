@@ -36,16 +36,16 @@ for beta in betas:
     plt.close()
 
 #%%
-beta = 0.001
-h_dim = [150, 50]
-z_dim = [4, 5]
+beta = 0.0003
+h_dim = [400, 150]
+z_dim = [3]
 
 for z in z_dim:
     encoder = create_vae_encoder(input_dim=num_features, hidden_dim=h_dim, latent_dim=z)
     decoder = create_vae_decoder(latent_dim=z, hidden_dim=h_dim, output_dim=num_features)
     vae = VAE(encoder, decoder, beta=beta)
-    vae.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5))
-    model, hist = train_val_vae(vae, train_data, val_data, epochs=500, verbose=1)
+    vae.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4))
+    model, hist = train_val_vae(vae, train_data, val_data, epochs=300, verbose=1)
     analyzer = VAEModelAnalyzer(model, next(iter(val_data)), z, feat_labels, hist=hist)
     save_path = os.path.join(cur, f'outputs/analysis/no_norm_data_z_{z}')
     if not os.path.exists(save_path):
