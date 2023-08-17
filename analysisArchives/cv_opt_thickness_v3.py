@@ -15,7 +15,7 @@ save_path = cur + '/outputs/models/vae_df/'
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 #%% Load Data
-filepath = os.path.join(cur, 'data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
+filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
 train_data, val_data, test_data, _ = generate_data_thickness_only(filepath)
 val_batch_size = val_data.cardinality().numpy()
 val_data_batched = val_data.batch(val_batch_size)
@@ -40,7 +40,7 @@ with open('outputs/CrossVal/cv_thickness_test.pkl', 'wb') as file:
     pickle.dump(results, file)
 
 #%%
-with open('outputs/CrossVal/cv_thickness_norm.pkl', 'rb') as file:
+with open('../outputs/CrossVal/cv_thickness_norm.pkl', 'rb') as file:
     results = pickle.load(file)
 
 #%% Defining the Heatmap Function
@@ -66,7 +66,7 @@ def create_heatmap_total(data, **kwargs):
     sns.heatmap(heatmap_df, annot=False, cmap='coolwarm', vmin=min_loss, vmax=max_loss, **kwargs)
 
 
-save_path = 'outputs/Images/CVAnalysis/'
+save_path = '../outputs/Images/CVAnalysis/'
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
@@ -152,7 +152,7 @@ g.set_axis_labels('Latent Dimensions', 'Beta')
 plt.savefig(save_path + 'heatmap_total_loss_v6.png')
 
 #%% Visualizing the Results for the Reconstruction Loss
-save_path = 'outputs/Images/CVAnalysis/'
+save_path = '../outputs/Images/CVAnalysis/'
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
@@ -180,7 +180,7 @@ g.add_legend()
 g.savefig(save_path + 'val_recon_loss_v5.png')
 
 #%% Visualizing the Results for the KL Loss
-save_path = 'outputs/Images/CVAnalysis/'
+save_path = '../outputs/Images/CVAnalysis/'
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 

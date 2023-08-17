@@ -70,6 +70,12 @@ class VAEModelAnalyzer:
 
         # P5
         vu.visualize_reconstruction_errors(self.model, self.data, num_recon=6, savefile=save_path + '/recon_errors.png')
+        vu.visualize_feature_errors(self.model, self.data, num_recon=6, feat_labels=self.feat_labels, random=True,
+                                    savefile=save_path + '/feature_errors.png')
+
+        vu.top_recon_error_visualization(self.model, self.data, savefile=save_path + '/top_recon_errors.png')
+        vu.top_feat_error_visualization(self.model, self.data, feat_labels=self.feat_labels,
+                                        savefile=save_path + '/top_feat_errors.png')
 
         if self.hist is not None:
             vu.plot_training_results_hist(self.hist, save_path)

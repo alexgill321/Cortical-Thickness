@@ -5,9 +5,10 @@ import seaborn as sns
 from sklearn.cluster import KMeans
 import pandas as pd
 import matplotlib.patches as mpatches
-from sklearn.metrics import silhouette_samples
+from sklearn.metrics import silhouette_samples, mean_squared_error
 import tensorflow as tf
 from scipy import stats
+from sklearn.linear_model import LinearRegression
 
 
 def visualize_latent_space(vae, data, labels=None, savefile=None):
@@ -299,9 +300,7 @@ def visualize_latent_influence(vae, data, z_dim, savefile=None):
     for i in range(z_dim):
         # vary the i-th dimension
         z_altered = np.copy(z)
-        original_mean = np.mean(z[:, i])
-        increase = 1.2 * original_mean - original_mean
-        z_altered[:, i] += increase
+        z_altered[:, i] = 1.5 * z[:, i]
 
         # 3. Decode the altered latent space
         altered_recon = vae.decoder(z_altered)
@@ -329,7 +328,7 @@ def visualize_latent_influence(vae, data, z_dim, savefile=None):
     return fig
 
 
-def visualize_latent_interpolation(vae, data, z_dim, feat_labels, num_features=10, savefile=None):
+def visualize_latent_interpolation(vae, data, z_dim, feat_labels, num_features=3, savefile=None):
     """ Visualize the influence of each dimension in the latent space on individual features
 
     This function encodes the input data using the vae model, then for each dimension in the latent space it alters the
@@ -384,12 +383,12 @@ def visualize_latent_interpolation(vae, data, z_dim, feat_labels, num_features=1
     n_rows = int(np.ceil(num_features / n_cols))
 
     # Create a figure for visualization
-    fig, axs = plt.subplots(ncols=n_cols, nrows=n_rows, figsize=(20, num_features * 2))
+    fig, axs = plt.subplots(ncols=n_cols, nrows=n_rows, figsize=(20, n_rows*5))
     axs = axs.flatten()
     # Visualize the mean error for each dimension in a bar chart
     for j in range(num_features):
         axs[j].bar(range(z_dim), feature_errors[j], tick_label=[f'{i+1}' for i in range(z_dim)])
-        axs[j].set_title(f'{feat_labels[selected_features[j]]}')
+        axs[j].set_title(f'{feat_labels[selected_features[j]]}', fontsize=20)
         axs[j].set_xlabel('Latent Dimension')
         axs[j].set_ylabel('Mean Error')
 
@@ -404,7 +403,7 @@ def visualize_latent_interpolation(vae, data, z_dim, feat_labels, num_features=1
     return fig, selected_features
 
 
-def visualize_latent_interpolation_chaos(vae, data, z_dim, feat_labels, num_features=10, savefile=None):
+def visualize_latent_interpolation_chaos(vae, data, z_dim, feat_labels, num_features=3, savefile=None):
     """ Visualize the influence of each dimension in the latent space on individual features
 
     This function encodes the input data using the vae model, then for each dimension in the latent space it alters the
@@ -462,7 +461,11 @@ def visualize_latent_interpolation_chaos(vae, data, z_dim, feat_labels, num_feat
     # Visualize the mean error for each dimension in a bar chart
     for j in range(num_features):
         axs[j].bar(range(z_dim), feature_errors[j], tick_label=[f'{i+1}' for i in range(z_dim)])
-        axs[j].set_title(f'{feat_labels[selected_features[j]]}')
+        feat_name = feat_labels[selected_features[j]]
+        # drop _thickness at end of feat_name
+        if feat_name[-10:] == '_thickness':
+            feat_name = feat_name[:-10]
+        axs[j].set_title(f'{feat_name}', fontsize=25)
         axs[j].set_xlabel('Latent Dimension')
         axs[j].set_ylabel('Mean Error')
 
@@ -520,7 +523,69 @@ def visualize_errors_hist(vae, data, savefile=None):
     p = stats.norm.pdf(x, mu, std)
     ax.plot(x, p, 'k', linewidth=2)
     title = "μ = %.2f,  σ = %.2f" % (mu, std)
-    ax.set_title(title)
+    ax.set_title(title, fontsize=30)
+
+    t_stat, p_val = stats.ttest_1samp(mean_errors, 0)
+    if p_val < 0.05:
+        ax.axvline(x=0, color='r', linestyle='--', label=f'p-value: {p_val:.2f}')
+    else:
+        ax.axvline(x=0, color='g', linestyle='--', label=f'p-value: {p_val:.2f}')
+
+    ax.legend()
+    ax.set_xlabel('Mean Error')
+    ax.set_ylabel('Density')
+
+    if savefile:
+        plt.savefig(savefile)
+
+    plt.close()
+    return fig
+
+
+def visualize_feat_errors_hist(vae, data, savefile=None):
+    """ Creates a Histogram of the mean reconstruction errors.
+
+    This function encodes the input data using the vae model, then decodes the latent space to generate a reconstruction
+    of the input. The error between the original input and the reconstruction is then calculated. The mean error for
+    each sample is then calculated and a histogram of the mean errors is plotted. A normal distribution is then fit to
+    the histogram, and the mean and standard deviation of the distribution are printed. Using this information, the
+    p-value of the mean error is calculated and printed. Using the p-value, the null hypothesis that the mean error is
+    normally distributed is either accepted or rejected, which is represented by the color of the p-value line on the
+    histogram.
+
+    The purpose of this visualization is to see if the model has a particular bias in the reconstruction of the input.
+
+    Args:
+        vae: A trained VAE model
+        data: A single batch of data to be used for the analysis
+        savefile (optional): The path to the file to save the visualization to
+    """
+
+    x, y = data
+    x = tf.cast(x, dtype=tf.float32)
+    # Generate the reconstruction
+    z_mean, z_log_var, z, x_reconstruction = vae(data)
+
+    # Calculate the error
+    error = x - x_reconstruction
+
+    # Calculate the mean error for each feature
+    mean_errors = np.mean(error, axis=0)
+
+    # Create a histogram of the mean errors
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.hist(mean_errors, bins=50, density=True, alpha=0.6, color='g')
+
+    # Fit a normal distribution to the data
+    mu, std = stats.norm.fit(mean_errors)
+
+    # Plot the PDF.
+    xmin, xmax = plt.xlim()
+    x = np.linspace(xmin, xmax, 100)
+    p = stats.norm.pdf(x, mu, std)
+    ax.plot(x, p, 'k', linewidth=2)
+    title = "μ = %.2f,  σ = %.2f" % (mu, std)
+    ax.set_title(title, fontsize=30)
 
     t_stat, p_val = stats.ttest_1samp(mean_errors, 0)
     if p_val < 0.05:
@@ -614,29 +679,44 @@ def plot_training_results_cv(cv_results, save_path):
     plt.close()
 
 
-def visualize_reconstruction_errors(vae, data, num_recon=10, random=False, savefile=None):
+def visualize_reconstruction_errors(vae, data, num_recon=6, random=False, idx=None, savefile=None):
     (x, y) = data
     z_mean, z_log_var, z, x_reconstruction = vae(data)
 
-    if random:
-        idx = np.random.choice(data.shape[0], num_recon, replace=False)
-    else:
-        idx = np.arange(num_recon)
+    if idx is None:
+        if random:
+            idx = np.random.choice(x.shape[0], num_recon, replace=False)
+        else:
+            idx = np.arange(num_recon)
 
-    fig, axs = plt.subplots(int(np.ceil(num_recon/2)), 2, figsize=(10, 20))
+    n_rows = int(np.ceil(num_recon/3))
+    fig, axs = plt.subplots(n_rows, 3, figsize=(15, 5*n_rows))
     axs = axs.flatten()
 
     for i in range(num_recon):
         x_data = x[idx[i], :].numpy()
         x_recon = x_reconstruction[idx[i], :].numpy()
+
+        # Fit linear regression model
+        lr_model = LinearRegression()
+        lr_model.fit(x_data.reshape(-1, 1), x_recon)
+
+        # Predict y values
+        y_pred = lr_model.predict(x_data.reshape(-1, 1))
+
         sns.scatterplot(x=x_data, y=x_recon, ax=axs[i], alpha=0.6)
-        # plot the diagonal
+        # Plot the diagonal (optimal fit)
         min_val = min(x_data.min(), x_recon.min())
         max_val = max(x_data.max(), x_recon.max())
-        axs[i].plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--')
-        axs[i].set_title(f"Patient {idx[i]}")
+        axs[i].plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--', label='Optimal Fit')
+
+        # Plot the linear regression fit
+        axs[i].plot(x_data, y_pred, color='green', linestyle='--', label='Actual Fit')
+
+        axs[i].set_title(f"Patient {idx[i]}", fontsize=25)
         axs[i].set_xlabel("Original")
         axs[i].set_ylabel("Reconstruction")
+        axs[i].legend(loc='upper left') # Add a legend
 
     for i in range(num_recon, len(axs)):
         fig.delaxes(axs[i])
@@ -649,5 +729,79 @@ def visualize_reconstruction_errors(vae, data, num_recon=10, random=False, savef
     plt.close()
     return fig
 
+
+def visualize_feature_errors(vae, data, feat_labels, num_recon=6, random=False, idx=None, savefile=None):
+    (x, y) = data
+    z_mean, z_log_var, z, x_reconstruction = vae(data)
+
+    if idx is None:
+        if random:
+            idx = np.random.choice(x.shape[1], num_recon, replace=False)
+        else:
+            idx = np.arange(num_recon)
+
+    n_rows = int(np.ceil(num_recon/3))
+    fig, axs = plt.subplots(n_rows, 3, figsize=(15, 5*n_rows))
+    axs = axs.flatten()
+
+    for i in range(num_recon):
+        x_data = x[:, idx[i]].numpy()
+        x_recon = x_reconstruction[:, idx[i]].numpy()
+
+        # Fit linear regression model
+        lr_model = LinearRegression()
+        lr_model.fit(x_data.reshape(-1, 1), x_recon)
+
+        # Predict y values
+        y_pred = lr_model.predict(x_data.reshape(-1, 1))
+
+        sns.scatterplot(x=x_data, y=x_recon, ax=axs[i], alpha=0.6)
+        # Plot the diagonal (optimal fit)
+        min_val = min(x_data.min(), x_recon.min())
+        max_val = max(x_data.max(), x_recon.max())
+        axs[i].plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--', label='Optimal Fit')
+
+        # Plot the linear regression fit
+        axs[i].plot(x_data, y_pred, color='green', linestyle=':', label='Actual Fit')
+
+        axs[i].set_title(f"{feat_labels[idx[i]]}", fontsize=25)
+        axs[i].set_xlabel("Original")
+        axs[i].set_ylabel("Reconstruction")
+        axs[i].legend(loc='upper left') # Add a legend
+
+    for i in range(num_recon, len(axs)):
+        fig.delaxes(axs[i])
+
+    plt.tight_layout()
+
+    if savefile:
+        plt.savefig(savefile)
+
+    plt.close()
+    return fig
+
+
+def top_feat_error_visualization(vae, data, feat_labels, savefile=None):
+    x, y = data
+    _, _, _, x_reconstruction = vae(data)
+
+    # Calculate the mean squared error for each feature
+    errors = [mean_squared_error(x[:, i].numpy(), x_reconstruction[:, i].numpy()) for i in range(x.shape[1])]
+    idx = np.argsort(errors)[-6:]
+
+    visualize_feature_errors(vae, data, feat_labels, len(idx), idx=idx, savefile=savefile)
+    return errors
+
+
+def top_recon_error_visualization(vae, data, savefile=None):
+    x, y = data
+    _, _, _, x_reconstruction = vae(data)
+
+    # Calculate the mean squared error for each patient
+    errors = [mean_squared_error(x[i].numpy(), x_reconstruction[i].numpy()) for i in range(len(x))]
+    idx = np.argsort(errors)[-6:]
+
+    visualize_reconstruction_errors(vae, data, len(idx), idx=idx, savefile=savefile)
+    return errors
 
 #%%

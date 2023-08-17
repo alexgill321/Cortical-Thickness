@@ -38,13 +38,14 @@ def generate_data(filepath):
     return train_x_norm, train_y, test_x_norm, test_y
 
 
-def generate_data_thickness_only(filepath, validation_split=0.2, normalize=False):
+def generate_data_thickness_only(filepath, validation_split=0.2, normalize=0):
     """ Generates data to be used in model training, returning data only from columns containing thickness data
 
     Args:
         filepath (str): path to the csv file containing the data
         validation_split (float): fraction of the data to be used for validation
-        normalize (bool): whether to normalize the data
+        normalize (int): Normalization method. 0 for no normalization, 1 for standard normalization, 2 for global mean
+         normalization
 
     Returns: train data, validation data and test data as numpy arrays, and the names of the columns in that order
     """
@@ -70,13 +71,19 @@ def generate_data_thickness_only(filepath, validation_split=0.2, normalize=False
 
     y_data = np.concatenate((one_hot_age, one_hot_sex), axis=1).astype('float32')
 
-    if normalize:
+    if normalize == 1:
+        scaler = StandardScaler()
+        train_x_norm = scaler.fit_transform(train_x)
+        test_x_norm = scaler.transform(test_x)
+    elif normalize == 2:
         global_mean_train_x = train_x.values.mean()  # Compute global mean across all features
         train_x_norm = train_x - global_mean_train_x
         test_x_norm = test_x - global_mean_train_x
-    else:
+    elif normalize == 0:
         train_x_norm = train_x.values
         test_x_norm = test_x.values
+    else:
+        raise ValueError("Invalid normalization method. Must be 0, 1 or 2")
 
     train_y = y_data[condition_indices, :]
     test_y = y_data[~db.index.isin(condition_indices), :]

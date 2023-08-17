@@ -137,23 +137,28 @@ def get_filename_from_params(params, epochs):
     return filename
 
 
-def load_or_train_model(path, params, train_data, epochs):
+def load_or_train_model(params, train_data, epochs, path=None, verbose=0):
     """ Load a VAE model from the given filepath.
 
     If a model exists at the given filepath, it is loaded and returned, otherwise a new model is created and returned.
 
     Args:
-        path (str): Path to load the model from.
+        path (str): Path to load the model from. Pass 'None' to always create a new model.
         params (dict): Dictionary of parameters.
         epochs (int): Desired training epochs.
         train_data (tf.data.Dataset): Training data.
+        verbose (int): Verbosity level passed to fit.
 
     Returns: VAE model loaded from the given filepath or a new model.
     """
-
-    filepath = os.path.join(path, get_filename_from_params(params, epochs))
     input_dim = train_data.element_spec[0].shape[0]
-    if os.path.exists(filepath):
+    if path is None:
+        print("Path is None. Creating a new model.")
+        filepath = None
+    else:
+        filepath = os.path.join(path, get_filename_from_params(params, epochs))
+
+    if filepath and os.path.exists(filepath):
         vae = load_vae(filepath)
         vae.compile()
         print(f'Loaded model from {filepath}.')
@@ -164,11 +169,12 @@ def load_or_train_model(path, params, train_data, epochs):
         vae = VAE(encoder, decoder, **params['vae'])
         vae.compile()
         print('Training model.')
-        vae.fit(train_data.batch(128), epochs=epochs, verbose=0)
-        if not os.path.exists(filepath):
-            os.makedirs(filepath)
-        save_vae(vae, filepath)
-        print(f'Saved model to {filepath}.')
+        vae.fit(train_data.batch(128), epochs=epochs, verbose=verbose)
+        if path is not None:
+            if not os.path.exists(filepath):
+                os.makedirs(filepath)
+            save_vae(vae, filepath)
+            print(f'Saved model to {filepath}.')
     return vae
 
 
