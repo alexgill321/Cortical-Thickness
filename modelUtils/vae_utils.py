@@ -7,6 +7,7 @@ import numpy as np
 import os
 from tqdm import tqdm
 import pickle
+from keras.callbacks import Callback
 
 
 def save_vae(vae, savefile):
@@ -64,7 +65,7 @@ def create_vae(n_features, h_dim, z_dim, beta=1.0):
     return vae
 
 
-def train_val_vae(vae, train_data, val_data, early_stop=None, epochs=200, savefile=None, lr_scheduler=None, verbose=1):
+def train_val_vae(vae, train_data, val_data, epochs=200, savefile=None, early_stop=None, callbacks=None, verbose=1):
     """ Train and validate a VAE model.
 
     Trains and validates a VAE model on the given training and validation data. The model is trained for the given
@@ -90,12 +91,13 @@ def train_val_vae(vae, train_data, val_data, early_stop=None, epochs=200, savefi
     else:
         stop_early = tf.keras.callbacks.EarlyStopping(monitor='val_total_loss', patience=epochs)
 
-    if lr_scheduler is None:
+    if callbacks is None:
         hist = vae.fit(train_data, epochs=epochs, validation_data=val_data,
                        callbacks=[stop_early], verbose=verbose)
     else:
+        callbacks.append(stop_early)
         hist = vae.fit(train_data, epochs=epochs, validation_data=val_data,
-                       callbacks=[stop_early, lr_scheduler], verbose=verbose)
+                       callbacks=callbacks, verbose=verbose)
 
     if savefile is not None:
         save_vae(vae, savefile)
@@ -461,4 +463,62 @@ def create_param_grid(h_dims, z_dims, dropouts, activations, initializers, betas
     ]
     return formatted_param_grid
 
+
+class CyclicAnnealingBeta:
+    """Scheduler that implements the cyclical annealing beta schedule as described in the paper.
+
+     Args:
+        step_size (int): Number of training iterations per half cycle.
+        cycles (int): Number of cycles (default M = 4).
+        proportion (float): Proportion used to increase beta within a cycle (default R = 0.5).
+
+    Attributes:
+        beta (float): Current beta value.
+        step_size (int): Number of training iterations per half cycle.
+        cycles (int): Number of cycles.
+        proportion (float): Proportion used to increase beta within a cycle.
+        iteration (int): Current iteration.
+     """
+    def __init__(self, step_size, cycles=4, proportion=0.5, max_beta=1e-3):
+        self.beta = 0
+        self.step_size = step_size
+        self.cycles = cycles
+        self.proportion = proportion
+        self.iteration = 0
+        self.max_beta = max_beta
+
+    def get_beta(self):
+        cycle_length = 2 * self.step_size
+        cycle_number = (self.iteration // cycle_length) % self.cycles
+        phase = (self.iteration % cycle_length) / cycle_length
+        if phase < self.proportion:
+            beta = self.max_beta * (phase / self.proportion)
+        else:
+            beta = self.max_beta
+
+        return beta
+
+    def step(self):
+        self.beta = self.get_beta()
+        self.iteration += 1
+        return self.beta
+
+
+class CyclicalAnnealingBetaCallback(Callback):
+    """Custom callback to update the beta value in the VAE model based on the cyclical annealing beta scheduler.
+
+    Args:
+        scheduler (CyclicAnnealingBeta): The cyclical annealing beta scheduler.
+
+    Attributes:
+        scheduler (CyclicAnnealingBeta): The cyclical annealing beta scheduler.
+    """
+    def __init__(self, scheduler):
+        super(CyclicalAnnealingBetaCallback, self).__init__()
+        self.scheduler = scheduler
+
+    def on_batch_begin(self, batch, logs=None):
+        # Update the beta value in the VAE model based on the scheduler
+        new_beta = self.scheduler.step()
+        self.model.beta.assign(new_beta)
 #%%

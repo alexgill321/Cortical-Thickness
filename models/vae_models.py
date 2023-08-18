@@ -164,7 +164,8 @@ class VAE(keras.Model):
             "reconstruction_loss": reconstruction_loss,
             "kl_loss": kl_loss,
             "total_loss": total_loss,
-            "lr": self.optimizer.lr
+            "lr": self.optimizer.lr,
+            "beta": self.beta
         }
 
     def test_step(self, batch_data):

@@ -763,11 +763,13 @@ def visualize_feature_errors(vae, data, feat_labels, num_recon=6, random=False, 
 
         # Plot the linear regression fit
         axs[i].plot(x_data, y_pred, color='green', linestyle=':', label='Actual Fit')
-
-        axs[i].set_title(f"{feat_labels[idx[i]]}", fontsize=25)
+        feat_name = feat_labels[idx[i]]
+        if feat_name[-10:] == '_thickness':
+            feat_name = feat_name[:-10]
+        axs[i].set_title(f"{feat_name}", fontsize=25)
         axs[i].set_xlabel("Original")
         axs[i].set_ylabel("Reconstruction")
-        axs[i].legend(loc='upper left') # Add a legend
+        axs[i].legend(loc='upper left')  # Add a legend
 
     for i in range(num_recon, len(axs)):
         fig.delaxes(axs[i])

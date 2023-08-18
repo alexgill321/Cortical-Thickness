@@ -51,7 +51,8 @@ class CyclicLR:
      Args:
         base_lr (float): Initial learning rate which is the lower boundary in the cycle.
         max_lr (float): Upper boundary in the cycle. Functionally, it defines the cycle amplitude (max_lr - base_lr).
-        step_size (int): Number of training iterations per half cycle. Authors suggest setting step_size
+        step_size (int): Number of training iterations per half cycle. Authors suggest setting step_size equal to 2-8
+        x training iterations in epoch.
 
     Attributes:
         base_lr (float): Initial learning rate which is the lower boundary in the cycle.
