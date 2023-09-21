@@ -18,6 +18,7 @@ train_data, val_data, test_data, feat_labels = generate_data_thickness_only(file
 num_features = train_data.element_spec[0].shape[0]
 train_data = train_data.batch(128)
 val_data = val_data.batch(val_data.cardinality().numpy())
+test_data = test_data.batch(test_data.cardinality().numpy())
 #%%
 """
 betas = [1e-4, 1e-5, 1e-6]
@@ -40,32 +41,32 @@ for beta in betas:
     plt.close()
 """
 #%%
-beta = 1
-h_dim = [300, 100]
-z_dim = [4]
-base_lr = 1e-7
-max_lr = 1e-3
-step_size = 40
+beta = 1e-4
+h_dim = [300, 150]
+z_dim = [2]
+base_lr = 1e-3
+max_lr = 1e-6
+step_size = 50
 decay_steps = 10
 decay_rate = 0.88
 
 # Create the cyclical annealing beta scheduler
-beta_scheduler = CyclicAnnealingBeta(step_size=500, proportion=0.6, max_beta=1e-4)
+# beta_scheduler = CyclicAnnealingBeta(step_size=500, proportion=0.6, max_beta=1e-4)
 
-# opt_scheduler = [CyclicLR(base_lr, step_size, max_lr, mode='triangular')]
+#opt_scheduler = [CyclicLR(base_lr, step_size, max_lr, mode='triangular')]
 # opt_scheduler = [ExponentialDecayScheduler(max_lr, decay_rate, decay_steps)]
 
 for z in z_dim:
-    encoder = create_vae_encoder(input_dim=num_features, hidden_dim=h_dim, latent_dim=z)
-    decoder = create_vae_decoder(latent_dim=z, hidden_dim=h_dim, output_dim=num_features)
+    encoder = create_vae_encoder(input_dim=num_features, hidden_dim=h_dim, latent_dim=z, dropout_rate=0.1)
+    decoder = create_vae_decoder(latent_dim=z, hidden_dim=h_dim, output_dim=num_features, dropout_rate=0.1)
     vae = VAE(encoder, decoder, beta=beta)
     vae.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4))
-    # optimizer = [vae.optimizer]
-    # lr_and_opt = zip(opt_scheduler, optimizer)
-    # scheduler = MultiOptimizerLearningRateScheduler(lr_and_opt)
-    scheduler = CyclicalAnnealingBetaCallback(beta_scheduler)
-    model, hist = train_val_vae(vae, train_data, val_data, callbacks=[scheduler], epochs=600, verbose=1)
-    analyzer = VAEModelAnalyzer(model, next(iter(val_data)), z, feat_labels, hist=hist)
+    #optimizer = [vae.optimizer]
+    #lr_and_opt = zip(opt_scheduler, optimizer)
+    #scheduler = MultiOptimizerLearningRateScheduler(lr_and_opt)
+    # scheduler = CyclicalAnnealingBetaCallback(beta_scheduler)
+    model, hist = train_val_vae(vae, train_data, val_data, epochs=400, verbose=1)
+    analyzer = VAEModelAnalyzer(model, next(iter(val_data)), z, feat_labels, hist=hist, test_data=next(iter(test_data)))
     save_path = os.path.join(cur, f'outputs/analysis/no_norm_data_z_{z}')
     if not os.path.exists(save_path):
         os.makedirs(save_path)

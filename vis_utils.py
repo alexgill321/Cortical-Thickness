@@ -11,11 +11,62 @@ from scipy import stats
 from sklearn.linear_model import LinearRegression
 
 
-def visualize_latent_space(vae, data, labels=None, savefile=None):
+def visualize_latent_space(vae, data, test_data=None, labels=None, savefile=None):
     """ Visualize the latent space of a VAE model
 
     This function encodes the input data using the vae model, then applies t-SNE to reduce the dimensionality of the
     latent space to 2D. The resulting 2D latent space is then plotted using a scatter plot.
+
+    Args:
+        vae: A trained VAE model
+        data: A single batch of data to be used for the analysis
+        test_data (optional): A single batch of test data to be used for the analysis
+        labels (optional): A list of labels for the data
+        savefile (optional): The path to the file to save the visualization to
+
+    Returns: The figure
+    """
+
+    z_mean, z_log_var, z, _ = vae(data)
+    z = z.numpy()
+    if test_data is not None:
+        eval_labels = ['Validation'] * len(z[:, 0])
+        z_mean, z_log_var, z_test, _ = vae(test_data)
+        z_test = z_test.numpy()
+        test_labels = ['Test'] * len(z_test[:, 0])
+        z = np.concatenate([z, z_test], axis=0)
+        # Create labels to separate validation and test data
+        all_labels = eval_labels + test_labels
+    else:
+        all_labels = labels
+
+    if z.shape[1] > 2:
+        tsne = TSNE(random_state=42)
+        z_2d = tsne.fit_transform(z)
+    else:
+        z_2d = z
+
+    fig = plt.figure(figsize=(8, 6))
+    if all_labels is None:
+        sns.scatterplot(x=z_2d[:, 0], y=z_2d[:, 1], alpha=0.6, label='Eval')
+    else:
+        sns.scatterplot(x=z_2d[:, 0], y=z_2d[:, 1], hue=all_labels, alpha=0.6,
+                        palette=sns.color_palette('tab10', len(set(all_labels))))
+
+    plt.xlabel("t-SNE 1")
+    plt.ylabel("t-SNE 2")
+    if savefile is not None:
+        plt.savefig(savefile)
+    plt.close()
+    return fig
+
+
+def visualize_latent_space_3d(vae, data, labels=None, savefile=None):
+    """ Visualize the 3D latent space of a VAE model
+
+    This function encodes the input data using the vae model, then applies t-SNE (if you want)
+    to reduce the dimensionality of the latent space to 3D.
+    The resulting 3D latent space is then plotted using a 3D scatter plot.
 
     Args:
         vae: A trained VAE model
@@ -29,19 +80,32 @@ def visualize_latent_space(vae, data, labels=None, savefile=None):
     z_mean, z_log_var, z, _ = vae(data)
     z = z.numpy()
 
-    tsne = TSNE(random_state=42)
-    z_2d = tsne.fit_transform(z)
+    # Uncomment the below lines if you still want to use t-SNE
+    # tsne = TSNE(n_components=3, random_state=42)
+    # z_3d = tsne.fit_transform(z)
 
     fig = plt.figure(figsize=(8, 6))
+    ax = fig.add_subplot(111, projection='3d')
+
     if labels is None:
-        sns.scatterplot(x=z_2d[:, 0], y=z_2d[:, 1], alpha=0.6)
+        ax.scatter(z[:, 0], z[:, 1], z[:, 2], alpha=0.6)
     else:
-        sns.scatterplot(x=z_2d[:, 0], y=z_2d[:, 1], hue=labels, alpha=0.6,
-                        palette=sns.color_palette('hsv', len(set(labels))))
-    plt.xlabel("t-SNE 1")
-    plt.ylabel("t-SNE 2")
+        unique_labels = list(set(labels))
+        colors = sns.color_palette('hsv', len(unique_labels))
+        for i, label in enumerate(unique_labels):
+            indices = [j for j, x in enumerate(labels) if x == label]
+            ax.scatter(z[indices, 0], z[indices, 1], z[indices, 2], alpha=0.6, c=[colors[i]], label=label)
+
+    ax.set_xlabel("Dimension 1")
+    ax.set_ylabel("Dimension 2")
+    ax.set_zlabel("Dimension 3")
+
+    if labels is not None:
+        ax.legend()
+
     if savefile is not None:
         plt.savefig(savefile)
+
     plt.close()
     return fig
 
@@ -130,7 +194,10 @@ def plot_latent_dimensions(vae, data, z_dim, savefile=None):
 
     Returns: The figure
     """
-    n_cols = 3
+    if z_dim > 2:
+        n_cols = 3
+    else:
+        n_cols = 2
     n_rows = int(np.ceil(z_dim / n_cols))
 
     fig, axs = plt.subplots(n_rows, n_cols, figsize=(15, 6*n_rows))
@@ -242,16 +309,16 @@ def visualize_top_clusters(vae, data, num_clusters, top_k, savefile=None):
     z_mean, z_log_var, z, _ = vae(data)
     z = z.numpy()
 
-    tsne = TSNE(random_state=42)
-    z_2d = tsne.fit_transform(z)
+    # tsne = TSNE(random_state=42)
+    # z_2d = tsne.fit_transform(z)
 
-    color_labels = np.zeros(z_2d.shape[0])
+    color_labels = np.zeros(z.shape[0])
     for i in range(len(top_cluster_indices)):
         color_labels[top_cluster_indices[i]] = i + 1
 
     fig = plt.figure(figsize=(8, 6))
     color_palette = ["gray"] + sns.color_palette('hsv', len(set(color_labels)) - 1)
-    sns.scatterplot(x=z_2d[:, 0], y=z_2d[:, 1], hue=color_labels, alpha=0.6, palette=color_palette, legend=False)
+    sns.scatterplot(x=z[:, 0], y=z[:, 1], hue=color_labels, alpha=0.6, palette=color_palette, legend=False)
 
     patch_list = []
     for i in range(int(np.max(color_labels)) + 1):
@@ -267,6 +334,74 @@ def visualize_top_clusters(vae, data, num_clusters, top_k, savefile=None):
     plt.ylabel("t-SNE 2")
     if savefile is not None:
         plt.savefig(savefile)
+    plt.close()
+    return fig
+
+
+def visualize_top_clusters_3d(vae, data, num_clusters, top_k, savefile=None):
+    """ Visualize the top clusters in the 3D latent space of a VAE model
+
+    Args:
+        vae: A trained VAE model
+        data: A single batch of data to be used for the analysis
+        num_clusters: The number of clusters used for the KMeans clustering
+        top_k: The number of top clusters to visualize
+        savefile (optional): The path to the file to save the visualization to
+
+    Returns: The figure
+    """
+    k_mean = KMeans(num_clusters, n_init='auto', random_state=42)
+    cluster_labels = k_mean.fit_predict(data[0])
+
+    silhouette_vals = silhouette_samples(data[0], cluster_labels)
+
+    silhouette_scores = []
+    for i in range(num_clusters):
+        score = np.mean(silhouette_vals[cluster_labels == i])
+        silhouette_scores.append((i, score))
+
+    top_clusters = sorted(silhouette_scores, key=lambda x: x[1], reverse=True)[:top_k]
+    top_cluster_indices = []
+
+    for idx, _ in top_clusters:
+        top_indexes = np.where(cluster_labels == idx)[0]
+        top_cluster_indices.append(top_indexes)
+
+    z_mean, z_log_var, z, _ = vae(data)
+    z = z.numpy()
+
+    color_labels = np.zeros(z.shape[0])
+    for i in range(len(top_cluster_indices)):
+        color_labels[top_cluster_indices[i]] = i + 1
+
+    fig = plt.figure(figsize=(8, 6))
+    ax = fig.add_subplot(111, projection='3d')
+
+    unique_labels = list(set(color_labels))
+    color_palette = ["gray"] + sns.color_palette('hsv', len(unique_labels) - 1)
+
+    for i, label in enumerate(unique_labels):
+        indices = [j for j, x in enumerate(color_labels) if x == label]
+        ax.scatter(z[indices, 0], z[indices, 1], z[indices, 2], alpha=0.6, c=[color_palette[i]])
+
+    ax.set_xlabel("Dimension 1")
+    ax.set_ylabel("Dimension 2")
+    ax.set_zlabel("Dimension 3")
+
+    patch_list = []
+    for i in range(len(unique_labels)):
+        if unique_labels[i] == 0:
+            label = "un-clustered"
+        else:
+            label = f"cluster {int(unique_labels[i])}"
+        data_key = mpatches.Patch(color=color_palette[i], label=label)
+        patch_list.append(data_key)
+
+    ax.legend(handles=patch_list)
+
+    if savefile is not None:
+        plt.savefig(savefile)
+
     plt.close()
     return fig
 

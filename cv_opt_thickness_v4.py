@@ -23,18 +23,19 @@ val_data_batched = val_data.batch(val_batch_size)
 input_dim = train_data.element_spec[0].shape[0]
 
 #%% Defining the Cross Validation
-latent_dims = [3, 4, 5, 10]
-beta = [0.01, 0.005, 0.001, 0.0005, 0.0001]
-hidden_dims = [[150, 100], [200, 150], [150, 150], [200, 200], [200, 100], [300, 150], [300, 100]]
-dropout = [0.1, 0.2, 0.3]
-epochs = 300
+latent_dims = [2, 3, 4, 5, 6]
+beta = [1e-4]
+hidden_dims = [[300, 150]]
+dropout = [0.1]
+lr = [1e-4]
+epochs = 400
 
 param_grid = create_param_grid(hidden_dims, latent_dims, dropout, ['relu'], ['glorot_uniform'], betas=beta)
 cv = VAECrossValidator(param_grid, input_dim, 5, batch_size=128, save_path=save_path)
 
 #%% Running the Cross Validation
 results = cv.cross_validate_df(train_data, epochs=epochs, verbose=0)
-with open('outputs/CrossVal/cv_thickness_global_norm.pkl', 'wb') as file:
+with open('outputs/CrossVal/cv_dim_eval_v2.pkl', 'wb') as file:
     pickle.dump(results, file)
 
 #%%
@@ -282,7 +283,7 @@ save_path = 'outputs/analysis/'
 gn_data = result.where(result['dataset_id'] == 'global_norm').dropna()
 
 params = gn_data['Parameters'].values[0]
-gn_vae = load_or_train_model(params=params, train_data=train_data, epochs=300, verbose=1)
+gn_vae = load_or_train_model(params=params, train_data=train_data, epochs=400, verbose=1)
 #%%
 z_dim = int(gn_data['Latent Dimensions'].values[0])
 analyzer = VAEModelAnalyzer(gn_vae, next(iter(val_data_batched)), z_dim, feat_labels, hist=None)
@@ -300,7 +301,7 @@ input_dim = train_data.element_spec[0].shape[0]
 sn_data = result.where(result['dataset_id'] == 'standard_norm').dropna()
 
 params = sn_data['Parameters'].values[0]
-sn_vae = load_or_train_model(params=params, train_data=train_data, epochs=300, verbose=1)
+sn_vae = load_or_train_model(params=params, train_data=train_data, epochs=400, verbose=1)
 #%%
 z_dim = int(sn_data['Latent Dimensions'].values[0])
 analyzer = VAEModelAnalyzer(sn_vae, next(iter(val_data_batched)), z_dim, feat_labels, hist=None)
@@ -318,7 +319,7 @@ input_dim = train_data.element_spec[0].shape[0]
 nn_data = result.where(result['dataset_id'] == 'no_norm').dropna()
 
 params = nn_data['Parameters'].values[0]
-nn_vae = load_or_train_model(params=params, train_data=train_data, epochs=300, verbose=1)
+nn_vae = load_or_train_model(params=params, train_data=train_data, epochs=400, verbose=1)
 
 #%%
 z_dim = int(nn_data['Latent Dimensions'].values[0])
@@ -327,3 +328,7 @@ save_file = os.path.join(save_path, 'nn_top_total_model')
 if not os.path.exists(save_file):
     os.makedirs(save_file)
 analyzer.full_stack(save_file)
+
+#%%
+z_3 = gn_res.where(gn_res['Latent Dimensions'] == 3).dropna()
+top = z_3.sort_values(by='R2').tail(5)

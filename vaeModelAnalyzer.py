@@ -24,15 +24,17 @@ class VAEModelAnalyzer:
 
     Attributes:
         model: A trained VAE model
-        data: A single batch of validation data to be used for the analysis
+        val_data: A single batch of validation data to be used for the analysis
+        test_data: A single batch of test data to be used for the analysis
         z: The dimensionality of the latent space
         feat_labels: The labels of the features in the data
         hist: (optional) The training history of the model
         model_results: A dictionary containing the metric results of the analysis
     """
-    def __init__(self, model, data, z, feat_labels, hist=None, cv_results=None):
+    def __init__(self, model, val_data, z, feat_labels, hist=None, cv_results=None, test_data=None):
         self.model = model
-        self.data = data
+        self.val_data = val_data
+        self.test_data = test_data
         self.z = z
         self.feat_labels = feat_labels
         self.hist = hist
@@ -47,35 +49,44 @@ class VAEModelAnalyzer:
         """
 
         # P1
-        vu.visualize_latent_space(self.model, self.data, savefile=save_path + '/latent_space.png')
-        vu.plot_latent_dimensions(self.model, self.data, z_dim=self.z, savefile=save_path + '/latent_dimensions.png')
+        vu.plot_latent_dimensions(self.model, self.val_data, z_dim=self.z, savefile=save_path + '/latent_dimensions.png')
 
         # P2
-        vu.visualize_top_clusters(self.model, self.data, num_clusters=30, top_k=5,
-                                  savefile=save_path + '/top_5_clusters.png')
+        if self.z == 3:
+            vu.visualize_latent_space_3d(self.model, self.val_data, savefile=save_path + '/latent_space.png')
+            vu.visualize_top_clusters_3d(self.model, self.val_data, num_clusters=30, top_k=5,
+                                         savefile=save_path + '/top_5_clusters.png')
+        else:
+            vu.visualize_latent_space(self.model, self.val_data, savefile=save_path + '/latent_space.png')
+            vu.visualize_top_clusters(self.model, self.val_data, num_clusters=30, top_k=5,
+                                      savefile=save_path + '/top_5_clusters.png')
 
         # P3
-        vu.visualize_latent_interpolation_chaos(self.model, self.data, feat_labels=self.feat_labels,
+        vu.visualize_latent_interpolation_chaos(self.model, self.val_data, feat_labels=self.feat_labels,
                                                 z_dim=self.z, savefile=save_path + '/latent_interpolation.png')
-        vu.visualize_latent_influence(self.model, self.data, z_dim=self.z, savefile=save_path + '/latent_influence.png')
+        vu.visualize_latent_influence(self.model, self.val_data, z_dim=self.z, savefile=save_path + '/latent_influence.png')
 
         # P4
-        rec_data = tf.data.Dataset.from_tensor_slices(self.data)
+        rec_data = tf.data.Dataset.from_tensor_slices(self.val_data)
         batched_data = rec_data.batch(rec_data.cardinality().numpy())
         _, self.model_results["R2"], _, _ = self.model.evaluate(batched_data)
-        vu.visualize_errors_hist(self.model, self.data, savefile=save_path + '/errors_hist.png')
-        vu.visualize_feat_errors_hist(self.model, self.data, savefile=save_path + '/feat_errors_hist.png')
-        self.model_results["Feature Errors"] = vu.calc_feature_errors(self.model, self.data,
+        vu.visualize_errors_hist(self.model, self.val_data, savefile=save_path + '/errors_hist.png')
+        vu.visualize_feat_errors_hist(self.model, self.val_data, savefile=save_path + '/feat_errors_hist.png')
+        self.model_results["Feature Errors"] = vu.calc_feature_errors(self.model, self.val_data,
                                                                       feat_labels=self.feat_labels,
                                                                       savefile=save_path + '/feature_errors.csv')
 
         # P5
-        vu.visualize_reconstruction_errors(self.model, self.data, num_recon=6, savefile=save_path + '/recon_errors.png')
-        vu.visualize_feature_errors(self.model, self.data, num_recon=6, feat_labels=self.feat_labels, random=True,
+        vu.visualize_reconstruction_errors(self.model, self.val_data, num_recon=6, savefile=save_path + '/recon_errors.png')
+        vu.visualize_feature_errors(self.model, self.val_data, num_recon=6, feat_labels=self.feat_labels, random=True,
                                     savefile=save_path + '/feature_errors.png')
-        vu.top_recon_error_visualization(self.model, self.data, savefile=save_path + '/top_recon_errors.png')
-        vu.top_feat_error_visualization(self.model, self.data, feat_labels=self.feat_labels,
+        vu.top_recon_error_visualization(self.model, self.val_data, savefile=save_path + '/top_recon_errors.png')
+        vu.top_feat_error_visualization(self.model, self.val_data, feat_labels=self.feat_labels,
                                         savefile=save_path + '/top_feat_errors.png')
+
+        if self.test_data is not None:
+            vu.visualize_latent_space(self.model, self.val_data, test_data=self.test_data,
+                                      savefile=save_path + '/latent_space_test.png')
 
         if self.hist is not None:
             vu.plot_training_results_hist(self.hist, save_path)

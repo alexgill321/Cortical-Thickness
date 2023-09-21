@@ -454,7 +454,7 @@ class TestVAEAnalyzer(unittest.TestCase):
         analyzer = VAEModelAnalyzer(self.model, self.data, self.z_dim, self.feat_labels)
         self.assertTrue(analyzer is not None)
         self.assertEqual(analyzer.z, self.z_dim)
-        self.assertEqual(analyzer.data, self.data)
+        self.assertEqual(analyzer.val_data, self.data)
         self.assertEqual(analyzer.model, self.model)
 
     def test_full_stack(self):
