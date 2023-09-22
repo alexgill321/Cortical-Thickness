@@ -10,7 +10,7 @@ vae_utils.py.
 import unittest
 import numpy as np
 import tensorflow as tf
-from models.vae_models import VAE, calc_kl_loss, create_vae_encoder, create_vae_decoder
+from models.vae_models import VAE, calc_kl_loss, create_vae_encoder, create_vae_decoder, r2_feat_score, r2_score
 import os
 from utils import generate_data_thickness_only, generate_feature_names
 from modelUtils.lr_utils import MultiOptimizerLearningRateScheduler, CyclicLR, ExponentialDecayScheduler
@@ -26,7 +26,7 @@ class TestVAEModel(unittest.TestCase):
     def setUp(self):
         cur = os.getcwd()
         filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-        self.train_data, self.val_data, self.test_data = generate_data_thickness_only(filepath)
+        self.train_data, self.val_data, self.test_data, _ = generate_data_thickness_only(filepath)
         self.h_dim = [100, 100]
         self.z_dim = 20
         self.input_dim = self.train_data.element_spec[0].shape[0]
@@ -52,21 +52,21 @@ class TestVAEModel(unittest.TestCase):
         x = tf.random.normal(shape=(self.batch_size, self.input_dim))
         z_mean, z_log_var = self.encoder(x)
         layers = self.encoder.layers
-        self.assertEqual(len(layers), len(self.h_dim)*2 + 3)
+        self.assertEqual(len(layers), len(self.h_dim) * 2 + 3)
         self.assertEqual(self.encoder.layers[0].input_shape[0], (None, self.input_dim))
         self.assertEqual(self.encoder.layers[-1].output_shape, (None, self.z_dim))
         for i in range(len(self.h_dim)):
-            self.assertEqual(self.encoder.layers[i*2+1].output_shape, (None, self.h_dim[i]))
+            self.assertEqual(self.encoder.layers[i * 2 + 1].output_shape, (None, self.h_dim[i]))
 
     def test_decoder_layer_shapes_simple(self):
         z = tf.random.normal(shape=(self.batch_size, self.z_dim))
         x = self.decoder(z)
         layers = self.decoder.layers
-        self.assertEqual(len(layers), len(self.h_dim)*2 + 2)
+        self.assertEqual(len(layers), len(self.h_dim) * 2 + 2)
         self.assertEqual(self.decoder.layers[0].input_shape[0], (None, self.z_dim))
         self.assertEqual(self.decoder.layers[-1].output_shape, (None, self.input_dim))
         for i in range(len(self.h_dim)):
-            self.assertEqual(self.decoder.layers[i*2+1].output_shape, (None, self.h_dim[i]))
+            self.assertEqual(self.decoder.layers[i * 2 + 1].output_shape, (None, self.h_dim[i]))
 
     def test_encoder_layer_shapes_complex(self):
         self.h_dim = [300, 200, 100]
@@ -74,11 +74,11 @@ class TestVAEModel(unittest.TestCase):
         x = tf.random.normal(shape=(self.batch_size, self.input_dim))
         z_mean, z_log_var = self.encoder(x)
         layers = self.encoder.layers
-        self.assertEqual(len(layers), len(self.h_dim)*2 + 3)
+        self.assertEqual(len(layers), len(self.h_dim) * 2 + 3)
         self.assertEqual(self.encoder.layers[0].input_shape[0], (None, self.input_dim))
         self.assertEqual(self.encoder.layers[-1].output_shape, (None, self.z_dim))
         for i in range(len(self.h_dim)):
-            self.assertEqual(self.encoder.layers[i*2+1].output_shape, (None, self.h_dim[i]))
+            self.assertEqual(self.encoder.layers[i * 2 + 1].output_shape, (None, self.h_dim[i]))
 
     def test_decoder_layer_shapes_complex(self):
         self.h_dim = [300, 200, 100]
@@ -86,12 +86,12 @@ class TestVAEModel(unittest.TestCase):
         z = tf.random.normal(shape=(self.batch_size, self.z_dim))
         x = self.decoder(z)
         layers = self.decoder.layers
-        self.assertEqual(len(layers), len(self.h_dim)*2 + 2)
+        self.assertEqual(len(layers), len(self.h_dim) * 2 + 2)
         self.assertEqual(self.decoder.layers[0].input_shape[0], (None, self.z_dim))
         self.assertEqual(self.decoder.layers[-1].output_shape, (None, self.input_dim))
         self.h_dim = self.h_dim[::-1]
         for i in range(len(self.h_dim)):
-            self.assertEqual(self.decoder.layers[i*2+1].output_shape, (None, self.h_dim[i]))
+            self.assertEqual(self.decoder.layers[i * 2 + 1].output_shape, (None, self.h_dim[i]))
 
     def test_vae_output_shape(self):
         train_data = self.train_data.batch(self.batch_size)
@@ -122,6 +122,35 @@ class TestVAEModel(unittest.TestCase):
         loss = self.vae.kl_loss_fn(z_mean, z_log_var)
         est_loss = tf.reduce_mean(-0.5 * tf.reduce_sum(1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var), axis=1))
         self.assertAlmostEqual(loss.numpy(), est_loss.numpy())
+
+    def test_r2_feat_score(self):
+        actual = tf.constant([[1.0, 2.0, 3.0],
+                              [4.0, 5.0, 6.0],
+                              [7.0, 8.0, 9.0]], dtype=tf.float32)
+        pred = tf.constant([[1.1, 1.9, 2.5],
+                            [4.6, 5.2, 6.3],
+                            [6.3, 7.8, 5.5]], dtype=tf.float32)
+        # Should come out as [0.952, 0.995, 0.301]
+        r2 = r2_feat_score(actual, pred)
+        self.assertEqual(r2.shape, (3,))
+        r2 = r2.numpy()
+        self.assertAlmostEqual(r2[0], 0.952, places=3)
+        self.assertAlmostEqual(r2[1], 0.995, places=3)
+        self.assertAlmostEqual(r2[2], 0.301, places=3)
+
+    def test_r2_score(self):
+        actual = tf.constant([[1.0, 2.0, 3.0],
+                              [4.0, 5.0, 6.0],
+                              [7.0, 8.0, 9.0]], dtype=tf.float32)
+        pred = tf.constant([[1.1, 1.9, 2.5],
+                            [4.6, 5.2, 6.3],
+                            [6.3, 7.8, 5.5]], dtype=tf.float32)
+        # Should come out as [0.865, 0.755, -5.39]
+        r2 = r2_score(actual, pred)
+        self.assertEqual(r2.shape, (3,))
+        self.assertAlmostEqual(r2[0], 0.865, places=3)
+        self.assertAlmostEqual(r2[1], 0.755, places=3)
+        self.assertAlmostEqual(r2[2], -5.39, places=3)
 
     def test_default_compilation(self):
         self.vae.compile()
@@ -209,7 +238,7 @@ class TestVAELearningRateScheduler(unittest.TestCase):
         tolerance = 1e-6
 
         for lr in history.history['lr']:
-            self.assertGreaterEqual(lr, self.base_lr * (self.decay_rate**self.epochs/self.step_size))
+            self.assertGreaterEqual(lr, self.base_lr * (self.decay_rate ** self.epochs / self.step_size))
             self.assertLessEqual(lr, self.base_lr + tolerance)
 
 
@@ -254,10 +283,9 @@ class TestVAEUtils(unittest.TestCase):
             shutil.rmtree(savefile)
 
     def test_create_vae(self):
-        input_dim = self.train_data.element_spec[0].shape[0]
         h_dim = [100, 100]
         z_dim = 20
-        vae = create_vae(input_dim, h_dim, z_dim)
+        vae = create_vae(self.input_dim, h_dim, z_dim)
         train_batches = self.train_data.batch(self.batch_size)
         data = next(iter(train_batches))
         z_mean, z_log_var, z, x_hat = self.vae(data)
@@ -282,6 +310,18 @@ class TestVAEUtils(unittest.TestCase):
         self.assertIn('lr', hist.history)
         self.assertLessEqual(len(hist.history['total_loss']), self.epochs)
         self.assertTrue(True)
+
+    def test_generate_metrics(self):
+        self.vae.compile()
+        train_batched = self.train_data.batch(self.batch_size)
+        val_batch_size = self.val_data.cardinality().numpy()
+        val_batched = self.val_data.batch(val_batch_size)
+        self.vae.fit(train_batched, epochs=self.epochs)
+        hist = self.vae.evaluate(val_batched, return_dict=True)
+        self.assertIn('r2', hist)
+        self.assertIn('r2_feat', hist)
+        self.assertEqual(len(hist['r2']), val_batch_size)
+        self.assertEqual(len(hist['r2_feat']), self.input_dim)
 
     def test_train_val_vae_with_lr_scheduler(self):
         self.vae.compile()
@@ -677,4 +717,4 @@ def generate_simple_cv(save_path):
 if __name__ == '__main__':
     unittest.main()
 
-#%%
+# %%

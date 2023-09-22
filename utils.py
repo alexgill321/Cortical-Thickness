@@ -57,6 +57,7 @@ def generate_data_thickness_only(filepath, validation_split=0.2, normalize=0):
     age = db[['age']].round(0)
     one_hot_age = enc_age.fit_transform(age['age'].values.reshape(-1, 1))
     condition_indices = db[db['dcode'] == 0].index
+    db = db.drop(['lh_MeanThickness_thickness', 'rh_MeanThickness_thickness'], axis=1, inplace=False)
     # Select columns ending with '_thickness'
     thickness_columns = [col for col in db.columns if col.endswith('_thickness')]
 

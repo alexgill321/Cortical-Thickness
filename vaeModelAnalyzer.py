@@ -69,7 +69,8 @@ class VAEModelAnalyzer:
         # P4
         rec_data = tf.data.Dataset.from_tensor_slices(self.val_data)
         batched_data = rec_data.batch(rec_data.cardinality().numpy())
-        _, self.model_results["R2"], _, _ = self.model.evaluate(batched_data)
+        hist = self.model.evaluate(batched_data, return_dict=True)
+        self.model_results["R2"] = np.mean(hist['r2_feat'][-1])
         vu.visualize_errors_hist(self.model, self.val_data, savefile=save_path + '/errors_hist.png')
         vu.visualize_feat_errors_hist(self.model, self.val_data, savefile=save_path + '/feat_errors_hist.png')
         self.model_results["Feature Errors"] = vu.calc_feature_errors(self.model, self.val_data,
