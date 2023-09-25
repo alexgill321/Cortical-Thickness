@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, MinMaxScaler
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
 
@@ -38,14 +38,15 @@ def generate_data(filepath):
     return train_x_norm, train_y, test_x_norm, test_y
 
 
-def generate_data_thickness_only(filepath, validation_split=0.2, normalize=0):
+def generate_data_thickness_only(filepath, validation_split=0.2, normalize=1):
     """ Generates data to be used in model training, returning data only from columns containing thickness data
 
     Args:
         filepath (str): path to the csv file containing the data
         validation_split (float): fraction of the data to be used for validation
         normalize (int): Normalization method. 0 for no normalization, 1 for standard normalization, 2 for global mean
-         normalization
+         normalization, 3 for min-max normalization
+        cov (bool): Whether to include covariates (sex, age) OHE in the data
 
     Returns: train data, validation data and test data as numpy arrays, and the names of the columns in that order
     """
@@ -83,8 +84,12 @@ def generate_data_thickness_only(filepath, validation_split=0.2, normalize=0):
     elif normalize == 0:
         train_x_norm = train_x.values
         test_x_norm = test_x.values
+    elif normalize == 3:
+        scaler = MinMaxScaler()
+        train_x_norm = scaler.fit_transform(train_x)
+        test_x_norm = scaler.transform(test_x)
     else:
-        raise ValueError("Invalid normalization method. Must be 0, 1 or 2")
+        raise ValueError("Invalid normalization method. Must be an integer from 0 - 3")
 
     train_y = y_data[condition_indices, :]
     test_y = y_data[~db.index.isin(condition_indices), :]
@@ -105,6 +110,7 @@ def generate_data_thickness_only_analysis(filepath, normalize=False):
     one_hot_sex = enc_sex.fit_transform(db['sex'].values.reshape(-1, 1))
     age = db[['age']].round(0)
     one_hot_age = enc_age.fit_transform(age['age'].values.reshape(-1, 1))
+    one_hot_cov = np.hstack((one_hot_sex, one_hot_age))
     condition_indices = db[db['dcode'] == 0].index
     # Select columns ending with '_thickness'
     thickness_columns = [col for col in db.columns if col.endswith('_thickness')]
@@ -134,7 +140,7 @@ def generate_data_thickness_only_analysis(filepath, normalize=False):
     train_y = y_data[condition_indices, :]
     test_y = y_data[~db.index.isin(condition_indices), :]
 
-    return (train_x_norm, train_y), (test_x_norm, test_y), data.columns
+    return (train_x_norm, train_y), (test_x_norm, test_y), data.columns, one_hot_cov
 
 
 def data_train_test(filepath):

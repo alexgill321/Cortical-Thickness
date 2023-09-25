@@ -16,8 +16,8 @@ save_path = cur + '/outputs/models/vae_gn/'
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 #%% Load Data
-filepath = os.path.join(cur, 'data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-train_data, val_data, test_data, feat_labels = generate_data_thickness_only(filepath, normalize=2)
+filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
+train_data, val_data, test_data, cov, feat_labels = generate_data_thickness_only(filepath, normalize=2)
 val_batch_size = val_data.cardinality().numpy()
 val_data_batched = val_data.batch(val_batch_size)
 input_dim = train_data.element_spec[0].shape[0]
@@ -35,11 +35,11 @@ cv = VAECrossValidator(param_grid, input_dim, 5, batch_size=128, save_path=save_
 
 #%% Running the Cross Validation
 results = cv.cross_validate_df(train_data, epochs=epochs, verbose=0)
-with open('outputs/CrossVal/cv_dim_eval_v2.pkl', 'wb') as file:
+with open('../outputs/CrossVal/cv_dim_eval_v2.pkl', 'wb') as file:
     pickle.dump(results, file)
 
 #%%
-with open('outputs/CrossVal/cv_thickness_global_norm.pkl', 'rb') as file:
+with open('../outputs/CrossVal/cv_thickness_global_norm.pkl', 'rb') as file:
     results = pickle.load(file)
 
 #%% Defining the Heatmap Function
@@ -65,7 +65,7 @@ def create_heatmap_total(data, **kwargs):
     sns.heatmap(heatmap_df, annot=False, cmap='coolwarm', vmin=min_loss, vmax=max_loss, **kwargs)
 
 
-save_path = 'outputs/Images/CVAnalysis/'
+save_path = '../outputs/Images/CVAnalysis/'
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
@@ -150,7 +150,7 @@ g.set_axis_labels('Latent Dimensions', 'Beta')
 plt.savefig(save_path + 'heatmap_total_loss_gn.png')
 
 #%% Visualizing the Results for the Reconstruction Loss
-save_path = 'outputs/Images/CVAnalysis/'
+save_path = '../outputs/Images/CVAnalysis/'
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
@@ -178,7 +178,7 @@ g.add_legend()
 g.savefig(save_path + 'val_recon_loss_gn.png')
 
 #%% Visualizing the Results for the KL Loss
-save_path = 'outputs/Images/CVAnalysis/'
+save_path = '../outputs/Images/CVAnalysis/'
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
@@ -206,18 +206,18 @@ g.add_legend()
 g.savefig(save_path + 'val_kl_loss_gn.png')
 
 #%% Visualization for analysis comparing norm methods
-with open('outputs/CrossVal/cv_thickness_global_norm.pkl', 'rb') as file:
+with open('../outputs/CrossVal/cv_thickness_global_norm.pkl', 'rb') as file:
     gn_res = pickle.load(file)
     gn_res['dataset_id'] = 'global_norm'
     gn_res['Hidden Dimensions'] = gn_res['Hidden Dimensions'].astype(str)
     gn_res.drop_duplicates(inplace=True, subset=['Hidden Dimensions', 'Latent Dimensions', 'Beta'])
 
-with open('outputs/CrossVal/cv_thickness_norm.pkl', 'rb') as file:
+with open('../outputs/CrossVal/cv_thickness_norm.pkl', 'rb') as file:
     sn_res = pickle.load(file)
     sn_res['dataset_id'] = 'standard_norm'
     sn_res['Hidden Dimensions'] = sn_res['Hidden Dimensions'].astype(str)
 
-with open('outputs/CrossVal/cv_thickness_v5.pkl', 'rb') as file:
+with open('../outputs/CrossVal/cv_thickness_v5.pkl', 'rb') as file:
     nn_res = pickle.load(file)
     nn_res['dataset_id'] = 'no_norm'
     nn_res['Hidden Dimensions'] = nn_res['Hidden Dimensions'].astype(str)
@@ -277,7 +277,7 @@ idx = combined_df.groupby('dataset_id')['Total Loss'].idxmax()
 result = combined_df.loc[idx]
 
 #%% Visualize the top models
-save_path = 'outputs/analysis/'
+save_path = '../outputs/analysis/'
 
 # global norm r2
 gn_data = result.where(result['dataset_id'] == 'global_norm').dropna()
@@ -293,7 +293,7 @@ if not os.path.exists(save_file):
 analyzer.full_stack(save_file)
 
 #%% Same for standard norm
-train_data, val_data, test_data, feat_labels = generate_data_thickness_only(filepath, normalize=1)
+train_data, val_data, test_data, cov, feat_labels = generate_data_thickness_only(filepath, normalize=1)
 val_batch_size = val_data.cardinality().numpy()
 val_data_batched = val_data.batch(val_batch_size)
 input_dim = train_data.element_spec[0].shape[0]
@@ -311,7 +311,7 @@ if not os.path.exists(save_file):
 analyzer.full_stack(save_file)
 
 #%% Same for no norm
-train_data, val_data, test_data, feat_labels = generate_data_thickness_only(filepath, normalize=0)
+train_data, val_data, test_data, cov, feat_labels = generate_data_thickness_only(filepath, normalize=0)
 val_batch_size = val_data.cardinality().numpy()
 val_data_batched = val_data.batch(val_batch_size)
 input_dim = train_data.element_spec[0].shape[0]

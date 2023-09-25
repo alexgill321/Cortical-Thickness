@@ -19,10 +19,9 @@ def create_vae_encoder(input_dim, hidden_dim, latent_dim, activation='relu', ini
     inputs = keras.layers.Input(shape=(input_dim,))
     x = inputs
     for h_dim in hidden_dim:
-        x = keras.layers.Dense(
-            h_dim,
-            activation=activation,
-            kernel_initializer=initializer)(x)
+        x = keras.layers.Dense(h_dim, kernel_initializer=initializer)(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Activation(activation)(x)
         x = keras.layers.Dropout(dropout_rate)(x)
     mu = keras.layers.Dense(
         latent_dim,
@@ -60,7 +59,11 @@ def create_vae_decoder(latent_dim, hidden_dim, output_dim, activation='relu', in
     hidden_dim = hidden_dim[::-1]
     # Add the hidden layers
     for h_dim in hidden_dim:
-        x = keras.layers.Dense(h_dim, activation=activation, kernel_initializer=initializer)(x)
+        x = keras.layers.Dense(
+            h_dim,
+            kernel_initializer=initializer)(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Activation(activation)(x)
         x = keras.layers.Dropout(dropout_rate)(x)
 
     # Add the output layer
@@ -145,12 +148,14 @@ class VAE(keras.Model):
         kl_loss_fn (function): The function to use to calculate the KL divergence loss
         optimizer (tf.keras.optimizers.Optimizer): The optimizer to use to train the model
         beta (float): The weight to use for the KL divergence loss
+        cov (bool): Whether or not to use the covariance matrix as input to the decoder
     """
     def __init__(
             self,
             encoder,
             decoder,
-            beta=1
+            beta=1,
+            cov=True
     ):
         super(VAE, self).__init__()
         self.encoder = encoder
@@ -159,6 +164,7 @@ class VAE(keras.Model):
         self.kl_loss_fn = None
         self.optimizer = None
         self.beta = beta
+        self.cov = cov
 
     def compile(
             self,
@@ -209,12 +215,20 @@ class VAE(keras.Model):
 
     def call(self, data, training=False, mask=None):
         x, y = data
-        z_mean, z_log_var = self.encoder(x, training=training)
+        if self.cov:
+            x_cov = tf.concat([x, y], axis=-1)
+            z_mean, z_log_var = self.encoder(x_cov, training=training)
+        else:
+            z_mean, z_log_var = self.encoder(x, training=training)
         batch = tf.shape(z_mean)[0]
         dim = tf.shape(z_mean)[1]
         epsilon = tf.keras.backend.random_normal(shape=(batch, dim))
         z = z_mean + tf.exp(0.5 * z_log_var) * epsilon
-        x_reconstructed = self.decoder(z, training=training)
+        if self.cov:
+            z_cov = tf.concat([z, y], axis=-1)
+            x_reconstructed = self.decoder(z_cov, training=training)
+        else:
+            x_reconstructed = self.decoder(z, training=training)
         return z_mean, z_log_var, z, x_reconstructed
 
     def get_config(self):

@@ -61,7 +61,7 @@ def visualize_latent_space(vae, data, test_data=None, labels=None, savefile=None
     return fig
 
 
-def visualize_latent_space_3d(vae, data, labels=None, savefile=None):
+def visualize_latent_space_3d(vae, data, test_data=None, savefile=None):
     """ Visualize the 3D latent space of a VAE model
 
     This function encodes the input data using the vae model, then applies t-SNE (if you want)
@@ -71,7 +71,7 @@ def visualize_latent_space_3d(vae, data, labels=None, savefile=None):
     Args:
         vae: A trained VAE model
         data: A single batch of data to be used for the analysis
-        labels (optional): A list of labels for the data
+        test_data (optional): A single batch of test data to be used for the analysis
         savefile (optional): The path to the file to save the visualization to
 
     Returns: The figure
@@ -83,31 +83,42 @@ def visualize_latent_space_3d(vae, data, labels=None, savefile=None):
     # Uncomment the below lines if you still want to use t-SNE
     # tsne = TSNE(n_components=3, random_state=42)
     # z_3d = tsne.fit_transform(z)
+    if test_data is not None:
+        eval_labels = ['Validation'] * len(z[:, 0])
+        z_mean, z_log_var, z_test, _ = vae(test_data)
+        z_test = z_test.numpy()
+        test_labels = ['Test'] * len(z_test[:, 0])
+        z = np.concatenate([z, z_test], axis=0)
+        # Create labels to separate validation and test data
+        all_labels = eval_labels + test_labels
+    else:
+        all_labels = None
 
     fig = plt.figure(figsize=(8, 6))
     ax = fig.add_subplot(111, projection='3d')
 
-    if labels is None:
-        ax.scatter(z[:, 0], z[:, 1], z[:, 2], alpha=0.6)
+    if all_labels is None:
+        ax.scatter(z[:, 0], z[:, 1], z[:, 2], alpha=0.6, label='Eval')
     else:
-        unique_labels = list(set(labels))
-        colors = sns.color_palette('hsv', len(unique_labels))
+        unique_labels = list(set(all_labels))
         for i, label in enumerate(unique_labels):
-            indices = [j for j, x in enumerate(labels) if x == label]
-            ax.scatter(z[indices, 0], z[indices, 1], z[indices, 2], alpha=0.6, c=[colors[i]], label=label)
+            if label == 'Validation':
+                indices = [j for j, x in enumerate(all_labels) if x == label]
+                ax.scatter(z[indices, 0], z[indices, 1], z[indices, 2], alpha=0.2, marker="v", c="blue", label=label)
+            elif label == 'Test':
+                indices = [j for j, x in enumerate(all_labels) if x == label]
+                ax.scatter(z[indices, 0], z[indices, 1], z[indices, 2], alpha=1, c="gold", label=label)
 
     ax.set_xlabel("Dimension 1")
     ax.set_ylabel("Dimension 2")
     ax.set_zlabel("Dimension 3")
 
-    if labels is not None:
+    if all_labels is not None:
         ax.legend()
 
     if savefile is not None:
         plt.savefig(savefile)
-
     plt.close()
-    return fig
 
 
 def visualize_latent_space_multiple(vae_models, data, labels, savefile=None):
@@ -436,9 +447,11 @@ def visualize_latent_influence(vae, data, z_dim, savefile=None):
         # vary the i-th dimension
         z_altered = np.copy(z)
         z_altered[:, i] = 1.5 * z[:, i]
-
         # 3. Decode the altered latent space
-        altered_recon = vae.decoder(z_altered)
+        if vae.cov:
+            altered_recon = vae.decoder(np.concatenate([z_altered, data[1]], axis=-1))
+        else:
+            altered_recon = vae.decoder(z_altered)
 
         # 4. Compute the error between original and altered
         error = np.abs(original_recon - altered_recon)
@@ -503,9 +516,11 @@ def visualize_latent_interpolation(vae, data, z_dim, feat_labels, num_features=3
         original_mean = np.mean(z[:, i])
         increase = 1.2 * original_mean - original_mean
         z_altered[:, i] += increase
-
         # 3. Decode the altered latent space
-        altered_recon = vae.decoder(z_altered)
+        if vae.cov:
+            altered_recon = vae.decoder(np.concatenate([z_altered, data[1]], axis=-1))
+        else:
+            altered_recon = vae.decoder(z_altered)
 
         # 4. Compute the error between original and altered
         error = np.abs(original_recon - altered_recon)
@@ -578,7 +593,10 @@ def visualize_latent_interpolation_chaos(vae, data, z_dim, feat_labels, num_feat
         z_altered[:, i] = 1.5 * z[:, i]
 
         # 3. Decode the altered latent space
-        altered_recon = vae.decoder(z_altered)
+        if vae.cov:
+            altered_recon = vae.decoder(np.concatenate([z_altered, data[1]], axis=-1))
+        else:
+            altered_recon = vae.decoder(z_altered)
 
         # 4. Compute the error between original and altered
         error = np.abs(original_recon - altered_recon)
@@ -782,6 +800,7 @@ def plot_training_results_hist(hist, save_path):
     plt.ylabel('Loss')
     plt.legend()
     plt.savefig(save_path + '/recon_loss_hist.png')
+    plt.close()
 
     plt.figure()
     plt.plot(hist.history['kl_loss'], label='Training Loss')
@@ -941,4 +960,40 @@ def top_recon_error_visualization(vae, data, savefile=None):
     visualize_reconstruction_errors(vae, data, len(idx), idx=idx, savefile=savefile)
     return errors
 
+
+def latent_gradient_attribution(vae, data, z_dim, savefile=None):
+    x_orig = data[0]
+    _, _, z, _ = vae(data)
+
+    # Calculate the gradient of the reconstruction with respect to the latent space
+    with tf.GradientTape() as tape:
+        if vae.cov:
+            z = tf.concat([z, data[1]], axis=-1)
+            tape.watch(z)
+            recon = vae.decoder(z)
+        else:
+            tape.watch(z)
+            recon = vae.decoder(z)
+        loss = vae.reconstruction_loss_fn(x_orig, recon)
+    grad = tape.gradient(loss, z)
+
+    # Calculate gradient percent contribution
+    row_sum = np.sum(np.abs(grad), axis=1, keepdims=True)
+    grad_contrib = np.abs(grad) / row_sum
+
+    # Calculate the mean gradient for each dimension
+    mean_grad = np.mean(grad_contrib, axis=0)
+
+    # Create a figure for visualization
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Visualize the mean gradient for each dimension in a bar chart
+    ax.bar(range(z_dim), abs(mean_grad[0:z_dim]), tick_label=[f'{i+1}' for i in range(z_dim)])
+    ax.set_xlabel('Latent Dimension')
+    ax.set_ylabel('Mean Gradient (Mean Percent Contribution)')
+
+    if savefile:
+        plt.savefig(savefile)
+
+    plt.close()
 #%%

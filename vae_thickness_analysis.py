@@ -7,7 +7,7 @@ from vaeModelAnalyzer import VAEModelAnalyzer
 cur = os.getcwd()
 #%% Load Data
 filepath = os.path.join(cur, 'data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-train_data, val_data, test_data, feat_labels = generate_data_thickness_only(filepath, normalize=True)
+train_data, val_data, test_data, cov, feat_labels = generate_data_thickness_only(filepath, normalize=True)
 val_batch_size = val_data.cardinality().numpy()
 val_data_batched = val_data.batch(val_batch_size)
 data = next(iter(val_data_batched))

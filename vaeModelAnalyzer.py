@@ -53,18 +53,23 @@ class VAEModelAnalyzer:
 
         # P2
         if self.z == 3:
-            vu.visualize_latent_space_3d(self.model, self.val_data, savefile=save_path + '/latent_space.png')
+            vu.visualize_latent_space_3d(self.model, self.val_data, test_data=self.test_data,
+                                         savefile=save_path + '/latent_space.png')
             vu.visualize_top_clusters_3d(self.model, self.val_data, num_clusters=30, top_k=5,
                                          savefile=save_path + '/top_5_clusters.png')
         else:
-            vu.visualize_latent_space(self.model, self.val_data, savefile=save_path + '/latent_space.png')
+            vu.visualize_latent_space(self.model, self.val_data, test_data=self.test_data,
+                                      savefile=save_path + '/latent_space.png')
             vu.visualize_top_clusters(self.model, self.val_data, num_clusters=30, top_k=5,
                                       savefile=save_path + '/top_5_clusters.png')
 
         # P3
         vu.visualize_latent_interpolation_chaos(self.model, self.val_data, feat_labels=self.feat_labels,
                                                 z_dim=self.z, savefile=save_path + '/latent_interpolation.png')
-        vu.visualize_latent_influence(self.model, self.val_data, z_dim=self.z, savefile=save_path + '/latent_influence.png')
+        vu.visualize_latent_influence(self.model, self.val_data, z_dim=self.z,
+                                      savefile=save_path + '/latent_influence.png')
+        vu.latent_gradient_attribution(self.model, self.val_data, z_dim=self.z,
+                                       savefile=save_path + '/latent_gradient.png')
 
         # P4
         rec_data = tf.data.Dataset.from_tensor_slices(self.val_data)

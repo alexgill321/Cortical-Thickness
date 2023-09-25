@@ -2,13 +2,16 @@ from utils import generate_data_thickness_only_analysis
 import os
 import seaborn as sns
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 #%%
 filename = os.path.join(os.getcwd(), 'data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-train, test, columns = generate_data_thickness_only_analysis(filename, normalize=False)
+train, test, columns, cov = generate_data_thickness_only_analysis(filename, normalize=True)
 #%%
 (train_x, train_y) = train
 (test_x, test_y) = test
+#%%
+counts = np.sum(cov, axis=0)
 
 #%%
 # Select the first 10 features from train_x

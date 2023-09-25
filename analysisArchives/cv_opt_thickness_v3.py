@@ -16,7 +16,7 @@ if not os.path.exists(save_path):
     os.makedirs(save_path)
 #%% Load Data
 filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-train_data, val_data, test_data, _ = generate_data_thickness_only(filepath)
+train_data, val_data, test_data, cov, _ = generate_data_thickness_only(filepath)
 val_batch_size = val_data.cardinality().numpy()
 val_data_batched = val_data.batch(val_batch_size)
 input_dim = train_data.element_spec[0].shape[0]

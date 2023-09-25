@@ -6,7 +6,7 @@
     and the multi optimizer learning rate scheduler.
 
     The tests are designed to be run with the following command:
-        python -m unittest unitTests.lr_unit_tests
+        python -m unittest UnitTests.lr_unit_tests
 """
 
 import unittest

@@ -472,7 +472,7 @@ class TestVAEAnalyzer(unittest.TestCase):
     def setUp(self):
         cur = os.getcwd()
         filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-        train_data, val_data, test_data, self.feat_labels = generate_data_thickness_only(filepath)
+        train_data, val_data, test_data, cov, self.feat_labels = generate_data_thickness_only(filepath)
         h_dim = [100, 100]
         self.z_dim = 20
         input_dim = train_data.element_spec[0].shape[0]
@@ -557,7 +557,7 @@ class TestVAEVisUtils(unittest.TestCase):
     def setUp(self):
         cur = os.getcwd()
         filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-        train_data, val_data, test_data, self.feat_labels = generate_data_thickness_only(filepath, normalize=True)
+        train_data, val_data, test_data, cov, self.feat_labels = generate_data_thickness_only(filepath, normalize=True)
         input_dim = train_data.element_spec[0].shape[0]
         h_dim = [100, 100]
         val_batch_size = val_data.cardinality().numpy()
@@ -704,7 +704,7 @@ class TestVAEVisUtils(unittest.TestCase):
 def generate_simple_cv(save_path):
     cur = os.getcwd()
     filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-    train_data, val_data, test_data, feat_labels = generate_data_thickness_only(filepath)
+    train_data, val_data, test_data, cov, feat_labels = generate_data_thickness_only(filepath)
     input_dim = train_data.element_spec[0].shape[0]
     if not os.path.exists(save_path):
         os.makedirs(save_path)

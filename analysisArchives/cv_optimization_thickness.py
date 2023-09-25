@@ -21,10 +21,11 @@ if not os.path.exists(save_path):
     os.makedirs(save_path)
 #%% Load Data
 filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-train_data, val_data, test_data = generate_data_thickness_only(filepath)
+train_data, val_data, test_data, _ = generate_data_thickness_only(filepath, normalize=1)
 val_batch_size = val_data.cardinality().numpy()
 val_data_batched = val_data.batch(val_batch_size)
 input_dim = train_data.element_spec[0].shape[0]
+cov_dim = train_data.element_spec[1].shape[0]
 
 #%% Defining the Cross Validation
 latent_dims = [2, 3, 4, 5, 7, 10, 15, 20]

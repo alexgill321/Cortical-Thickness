@@ -2,7 +2,7 @@
 
 This script contains unit tests for the AAE model and its components. The tests are run using the unittest framework.
 The tests are run using the following command:
-    python -m unittest unitTests.aae_unit_tests
+    python -m unittest UnitTests.aae_unit_tests
 
 The tests are run on the following functions:
     - AAEEncoder
