@@ -44,7 +44,7 @@ for beta in betas:
 #%%
 beta = 1e-5
 h_dim = [512, 256]
-z_dim = [30]
+z_dim = [5]
 base_lr = 1e-3
 max_lr = 1e-6
 step_size = 50

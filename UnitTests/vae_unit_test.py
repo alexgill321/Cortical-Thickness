@@ -15,7 +15,7 @@ import os
 from utils import generate_data_thickness_only, generate_feature_names
 from modelUtils.lr_utils import MultiOptimizerLearningRateScheduler, CyclicLR, ExponentialDecayScheduler
 from modelUtils.vae_utils import train_val_vae, create_vae, VAECrossValidator, save_vae, load_vae, \
-    get_filename_from_params, create_param_grid, load_or_train_model
+    get_filename_from_params, create_param_grid, load_or_train_model, create_param_df
 import vis_utils as vu
 import shutil
 from vaeModelAnalyzer import VAEModelAnalyzer
@@ -700,6 +700,90 @@ class TestVAEVisUtils(unittest.TestCase):
         self.assertTrue(ax.get_ylabel() == "Reconstruction")
         shutil.rmtree(save_path)
 
+class TestCrossValidation(unittest.TestCase):
+    def setUp(self) -> None:
+        return super().setUp()
+    
+    def test_create_param_df_default(self):
+        param_df = create_param_df()
+        self.assertEqual(len(param_df), 1)
+        row = param_df.iloc[0]
+        self.assertEqual(row['h_dim'], [512, 256])
+        self.assertEqual(row['z_dim'], 10)
+        self.assertEqual(row['dropout'], 0.2)
+        self.assertEqual(row['activation'], 'relu')
+        self.assertEqual(row['initializer'], 'glorot_normal')
+        self.assertEqual(row['beta'], 0.001)
+        self.assertEqual(row['conditioning'], True)
+    
+    def test_create_param_df_simple(self):
+        param_df = create_param_df(h_dim=[[256, 128]],
+                                    z_dim=[5],
+                                    dropout=[0.1],
+                                    activation=['sigmoid'],
+                                    initializer=['glorot_uniform'],
+                                    beta=[0.01], 
+                                    conditioning=[False]
+                                    )
+        self.assertEqual(len(param_df), 1)
+        row = param_df.iloc[0]
+        self.assertEqual(row['h_dim'], [256, 128])
+        self.assertEqual(row['z_dim'], 5)
+        self.assertEqual(row['dropout'], 0.1)
+        self.assertEqual(row['activation'], 'sigmoid')
+        self.assertEqual(row['initializer'], 'glorot_uniform')
+        self.assertEqual(row['beta'], 0.01)
+        self.assertEqual(row['conditioning'], False)
+
+    def test_create_param_df_complex(self):
+        param_df = create_param_df(h_dim=[[256, 128], [512, 256]],
+                                    z_dim=[5, 10],
+                                    dropout=[0.1, 0.2],
+                                    activation=['sigmoid', 'relu'],
+                                    initializer=['glorot_uniform', 'glorot_normal'],
+                                    beta=[0.01, 0.001], 
+                                    conditioning=[False, True]
+                                    )
+        self.assertEqual(len(param_df), 128)
+        for i, row in param_df.iterrows():
+            self.assertIn(row['h_dim'], [[256, 128], [512, 256]])
+            self.assertIn(row['z_dim'], [5, 10])
+            self.assertIn(row['dropout'], [0.1, 0.2])
+            self.assertIn(row['activation'], ['sigmoid', 'relu'])
+            self.assertIn(row['initializer'], ['glorot_uniform', 'glorot_normal'])
+            self.assertIn(row['beta'], [0.01, 0.001])
+            self.assertIn(row['conditioning'], [False, True])
+    
+    def test_create_param_df_custom(self):
+        param_df = create_param_df(normalizations = [0, 1], subsets = ["all", "thickness"])
+        self.assertEqual(len(param_df), 4)
+        for i, row in param_df.iterrows():
+            self.assertIn(row['normalizations'], [0, 1])
+            self.assertIn(row['subsets'], ["all", "thickness"])
+    
+    def test_create_param_df_custom_complex(self):
+        param_df = create_param_df(normalizations = [0, 1], 
+                        subsets = ["all", "thickness"], 
+                        h_dim=[[256, 128], [512, 256]],
+                        z_dim=[5, 10],
+                        dropout=[0.1, 0.2],
+                        activation=['sigmoid', 'relu'],
+                        initializer=['glorot_uniform', 'glorot_normal'],
+                        beta=[0.01, 0.001], 
+                        conditioning=[False, True]
+                        )
+        self.assertEqual(len(param_df), 512)
+        for i, row in param_df.iterrows():
+            self.assertIn(row['normalizations'], [0, 1])
+            self.assertIn(row['subsets'], ["all", "thickness"])
+            self.assertIn(row['h_dim'], [[256, 128], [512, 256]])
+            self.assertIn(row['z_dim'], [5, 10])
+            self.assertIn(row['dropout'], [0.1, 0.2])
+            self.assertIn(row['activation'], ['sigmoid', 'relu'])
+            self.assertIn(row['initializer'], ['glorot_uniform', 'glorot_normal'])
+            self.assertIn(row['beta'], [0.01, 0.001])
+            self.assertIn(row['conditioning'], [False, True])
+        
 
 def generate_simple_cv(save_path):
     cur = os.getcwd()

@@ -8,6 +8,10 @@ import os
 from tqdm import tqdm
 import pickle
 from keras.callbacks import Callback
+import itertools
+from utils import generate_data
+from typing import Any
+import inspect
 
 
 def save_vae(vae, savefile):
@@ -138,6 +142,9 @@ def get_filename_from_params(params, epochs):
     filename += f'e_{epochs}'
     return filename
 
+def get_filename_from_df(row):
+    # TODO: implement this
+    return "not implemented yet"
 
 def load_or_train_model(params, train_data, epochs, path=None, verbose=0):
     """ Load a VAE model from the given filepath.
@@ -463,6 +470,111 @@ def create_param_grid(h_dims, z_dims, dropouts, activations, initializers, betas
     ]
     return formatted_param_grid
 
+
+def create_param_df(conditioning: list[bool] = None, h_dim: list[list[int]] = None, z_dim: list[int] = None,
+                    dropout: list[float] = None, activation: list[str] = None, initializer: list[str] = None,
+                    beta: list[float] = None, **kwargs: Any) -> pd.DataFrame:
+    """ Creates a parameter grid as a dataframe from the given parameters.
+
+    Args:
+        conditioning (list[bool]): List of condition values to use.
+        h_dim (list[list[int]]): List of hidden layer dimensions to use.
+        z_dim (list[int]): List of latent dimensions to use.
+        dropout (list[float]): List of dropout rates to use.
+        activation (list[str]): List of activation functions to use.
+        initializer (list[str]): List of initializers to use.
+        beta (list[float]): List of beta values to use.
+
+    Returns: Parameter grid as a dataframe.
+    """
+    if conditioning is None:
+        conditioning = [True]
+    if h_dim is None:
+        h_dim = [[512, 256]]
+    if z_dim is None:
+        z_dim = [10]
+    if dropout is None:
+        dropout = [0.2]
+    if activation is None:
+        activation = ['relu']
+    if initializer is None:
+        initializer = ['glorot_normal']
+    if beta is None:
+        beta = [0.001]
+
+
+    kwargs_list = list(items for _, items in kwargs.items())
+    param_combinations = itertools.product(conditioning, h_dim, z_dim, dropout, activation,
+                                           initializer, beta, *kwargs_list)
+    arg_names = list(inspect.signature(create_param_df).parameters.keys())
+    arg_names.remove('kwargs')
+    for key, _ in kwargs.items():
+        arg_names.append(key)
+    param_df = pd.DataFrame(param_combinations, columns=[arg_names])
+    return param_df
+
+class VAECrossValidatorDF:
+    def __init__(self, param_df: pd.DataFrame, k_folds: int = 5, save_path: str = None):
+        self.param_df = param_df
+        self.save_path = save_path
+        self.kf = KFold(n_splits=k_folds)
+    
+    def cross_validate(self, datapath: str, verbose: int = 1):
+        """ Run a cross validation for k folds over the data provided in the given dataframe.
+
+        Args:
+            datapath (str): Path to the data to use for cross validation.
+            verbose (int): Verbosity level passed to fit.
+              0 = silent, 1 = progress bar on cross validations, 2 = metrics for model training
+
+        Returns: A dataframe containing the parameters tested and the results of the cross validation.
+        """
+
+        out_df = self.param_df.copy()
+        out_df['train'] = None
+        out_df['val'] = None
+        out_df['test'] = None
+        out_df['labels'] = None
+        if "normalization" in self.param_df.columns and "subset" in self.param_df.columns:
+            for norm, subset in zip(self.param_df["normalization"], self.param_df["subset"]).unique():
+                train, val, test, labels = generate_data(datapath, norm, subset)
+                out_df.loc[(out_df["normalization"] == norm) & (out_df["subset"] == subset), "train"] = train
+                out_df.loc[(out_df["normalization"] == norm) & (out_df["subset"] == subset), "val"] = val
+                out_df.loc[(out_df["normalization"] == norm) & (out_df["subset"] == subset), "test"] = test
+                out_df.loc[(out_df["normalization"] == norm) & (out_df["subset"] == subset), "labels"] = labels
+        elif "normalization" in self.param_df.columns:
+            for norm in self.param_df["normalization"].unique():
+                train, val, test, labels = generate_data(datapath, norm)
+                out_df.loc[out_df["normalization"] == norm, "train"] = train
+                out_df.loc[out_df["normalization"] == norm, "val"] = val
+                out_df.loc[out_df["normalization"] == norm, "test"] = test
+                out_df.loc[out_df["normalization"] == norm, "labels"] = labels
+        elif "subset" in self.param_df.columns:
+            for subset in self.param_df["subset"].unique():
+                train, val, test, labels = generate_data(datapath, subset=subset)
+                out_df.loc[out_df["subset"] == subset, "train"] = train
+                out_df.loc[out_df["subset"] == subset, "val"] = val
+                out_df.loc[out_df["subset"] == subset, "test"] = test
+                out_df.loc[out_df["subset"] == subset, "labels"] = labels
+        else:
+            train, val, test, labels = generate_data(datapath)
+            out_df["train"] = train
+            out_df["val"] = val
+            out_df["test"] = test
+            out_df["labels"] = labels
+
+        for i, row in tqdm(out_df.iterrows(), total=len(out_df), desc="Model Progress", ncols=80):
+            vae = None
+            if "batch_size" in self.param_df.columns:
+                data = row["train"].shuffle(10000).batch(row["batch_size"])
+            else:
+                data = row["train"].shuffle(10000).batch(256)
+            val_data = row["val"].batch(row["val"].cardinality().numpy())
+
+            if self.save_path is not None:
+                filename = get_filename_from_df(row)
+                self.save_path = os.path.join(os.getcwd(), filename)
+        
 
 class CyclicAnnealingBeta:
     """Scheduler that implements the cyclical annealing beta schedule as described in the paper.

@@ -14,13 +14,13 @@ cur = os.getcwd()
 cv_res = []
 
 # %% Load data
-filepath = os.path.join(cur, 'data/cleaned_data/megasample_cleaned.csv')
+filepath = os.path.join(cur, '../data/cleaned_data/megasample_cleaned.csv')
 feat_labels = generate_feature_names(filepath)
 train_data, val_data, test_data = data_validation(filepath, validation_split=0.2)
 val_batch_size = val_data.cardinality().numpy()
 val_data_batched = val_data.batch(val_batch_size)
 data = next(iter(val_data_batched))
-path = os.path.join(cur, 'outputs/models/vae/')
+path = os.path.join(cur, '../outputs/models/vae/')
 
 # %% Control Result Generation
 P1 = False

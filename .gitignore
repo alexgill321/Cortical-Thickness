@@ -7,3 +7,7 @@ outputs/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+
+__pycache__
+
+unitTests/__pycache__/
