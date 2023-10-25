@@ -70,6 +70,7 @@ def create_vae(n_features, h_dim, z_dim, beta=1.0):
 
 
 def train_val_vae(vae, train_data, val_data, epochs=200, savefile=None, early_stop=None, callbacks=None, verbose=1):
+
     """ Train and validate a VAE model.
 
     Trains and validates a VAE model on the given training and validation data. The model is trained for the given
@@ -110,6 +111,7 @@ def train_val_vae(vae, train_data, val_data, epochs=200, savefile=None, early_st
 
 
 def get_filename_from_params(params, epochs):
+
     """ Create a filename from the given parameters.
 
     Example filename for a VAE with 2 hidden layers of [100, 100], 10 latent dimensions and beta=0.1 trained for 200
@@ -142,9 +144,11 @@ def get_filename_from_params(params, epochs):
     filename += f'e_{epochs}'
     return filename
 
+
 def get_filename_from_df(row):
     # TODO: implement this
     return "not implemented yet"
+
 
 def load_or_train_model(params, train_data, epochs, path=None, verbose=0):
     """ Load a VAE model from the given filepath.
@@ -513,7 +517,24 @@ def create_param_df(conditioning: list[bool] = None, h_dim: list[list[int]] = No
     param_df = pd.DataFrame(param_combinations, columns=[arg_names])
     return param_df
 
+
 class VAECrossValidatorDF:
+    """ Class for cross validating VAE models. Uses a dataframe to store the parameters for cross validation and 
+    results.
+
+    Args:
+        param_df (pd.DataFrame): Dataframe containing the parameters to test.
+            Note that the cross validation accepts some additional parameters to the DataFrame default. Currently
+            supported additional parameters are: \n
+                - normalization (int): Normalization to use for the data. Must be one of 0, 1, 2 or 3. Definitions are found in utils \n
+                - subset (str): Subset of the data to use. Must be one of 'all', 'thickness', 'volume', or 'thickness_volume'. \n
+                - batch_size (int): Batch size to use for training. \n
+                - lr (float): Learning rate to use for training. \n
+                - epochs (int): Number of epochs to train for. \n
+                - lr_scheduler (tf.keras.callbacks.LearningRateScheduler): Learning rate scheduler to use for training. \n
+        k_folds (int): Number of folds to use for cross validation.
+        save_path (str): Path to save the models to.
+    """
     def __init__(self, param_df: pd.DataFrame, k_folds: int = 5, save_path: str = None):
         self.param_df = param_df
         self.save_path = save_path
@@ -525,56 +546,138 @@ class VAECrossValidatorDF:
         Args:
             datapath (str): Path to the data to use for cross validation.
             verbose (int): Verbosity level passed to fit.
-              0 = silent, 1 = progress bar on cross validations, 2 = metrics for model training
+              0 = progress bar on cross validations, 1 = progress bar on folds for current model, 2 = metrics for model training
 
         Returns: A dataframe containing the parameters tested and the results of the cross validation.
         """
 
-        out_df = self.param_df.copy()
-        out_df['train'] = None
-        out_df['val'] = None
-        out_df['test'] = None
-        out_df['labels'] = None
+        data_sets = {}
         if "normalization" in self.param_df.columns and "subset" in self.param_df.columns:
-            for norm, subset in zip(self.param_df["normalization"], self.param_df["subset"]).unique():
+            for norm, subset in set(zip(self.param_df["normalization"], self.param_df["subset"])):
                 train, val, test, labels = generate_data(datapath, norm, subset)
-                out_df.loc[(out_df["normalization"] == norm) & (out_df["subset"] == subset), "train"] = train
-                out_df.loc[(out_df["normalization"] == norm) & (out_df["subset"] == subset), "val"] = val
-                out_df.loc[(out_df["normalization"] == norm) & (out_df["subset"] == subset), "test"] = test
-                out_df.loc[(out_df["normalization"] == norm) & (out_df["subset"] == subset), "labels"] = labels
+                data_sets[(norm, subset)] = (train, val, test, labels)
         elif "normalization" in self.param_df.columns:
-            for norm in self.param_df["normalization"].unique():
+            for norm in set(self.param_df["normalization"].items()):
                 train, val, test, labels = generate_data(datapath, norm)
-                out_df.loc[out_df["normalization"] == norm, "train"] = train
-                out_df.loc[out_df["normalization"] == norm, "val"] = val
-                out_df.loc[out_df["normalization"] == norm, "test"] = test
-                out_df.loc[out_df["normalization"] == norm, "labels"] = labels
+                data_sets[norm] = (train, val, test, labels)
         elif "subset" in self.param_df.columns:
             for subset in self.param_df["subset"].unique():
                 train, val, test, labels = generate_data(datapath, subset=subset)
-                out_df.loc[out_df["subset"] == subset, "train"] = train
-                out_df.loc[out_df["subset"] == subset, "val"] = val
-                out_df.loc[out_df["subset"] == subset, "test"] = test
-                out_df.loc[out_df["subset"] == subset, "labels"] = labels
+                data_sets[subset] = (train, val, test, labels)    
         else:
             train, val, test, labels = generate_data(datapath)
-            out_df["train"] = train
-            out_df["val"] = val
-            out_df["test"] = test
-            out_df["labels"] = labels
+            
 
-        for i, row in tqdm(out_df.iterrows(), total=len(out_df), desc="Model Progress", ncols=80):
-            vae = None
+        for j, row in tqdm(self.param_df.iterrows(), total=len(self.param_df), desc="Model Progress", ncols=80):
+            best_cv_total_loss = []
+            best_cv_recon_loss = []
+            best_cv_kl_loss = []
+            best_cv_r2 = []
+            cv_total_hist = []
+            cv_recon_hist = []
+            cv_kl_hist = []
+            training_total_hist = []
+            training_recon_hist = []
+            training_kl_hist = []
+            validation_r2 = []
+
+            if "normalization" in self.param_df.columns and "subset" in self.param_df.columns:
+                train, val, test, labels = data_sets[(row["normalization"], row["subset"])]
+            elif "normalization" in self.param_df.columns:
+                train, val, test, labels = data_sets[row["normalization"]]
+            elif "subset" in self.param_df.columns:
+                train, val, test, labels = data_sets[row["subset"]]
+                
             if "batch_size" in self.param_df.columns:
-                data = row["train"].shuffle(10000).batch(row["batch_size"])
+                data = train.shuffle(10000).batch(row["batch_size"])
             else:
-                data = row["train"].shuffle(10000).batch(256)
-            val_data = row["val"].batch(row["val"].cardinality().numpy())
+                data = train.shuffle(10000).batch(256)
+            val_data = val.batch(val.cardinality().numpy())
 
+            for i in tqdm(range(self.kf.n_splits), desc="Fold Progress", ncols=80, disable = True if verbose < 1 else False):
+                vae = None
+                if self.save_path is not None:
+                    filename = get_filename_from_df(row)
+                    self.save_path = os.path.join(os.getcwd(), filename)
+                
+                input_dim = train.element_spec[0].shape[0]
+                cov_dim = train.element_spec[1].shape[0]
+                if(row["conditioning"]):
+                    encoder = create_vae_encoder(input_dim + cov_dim, row["h_dim"], row["z_dim"], row["activation"], 
+                                                row["initializer"], row["dropout"])
+                    decoder = create_vae_decoder(row["z_dim"] + cov_dim, row["h_dim"], input_dim, row["activation"],
+                                                row["initializer"], row["dropout"])
+                    vae = VAE(encoder, decoder, row['beta'], cov=True)
+                else:
+                    encoder = create_vae_encoder(input_dim, row["h_dim"], row["z_dim"], row["activation"], 
+                                                row["initializer"], row["dropout"])
+                    decoder = create_vae_decoder(row["z_dim"], row["h_dim"], input_dim, row["activation"],
+                                                row["initializer"], row["dropout"])
+                    vae = VAE(encoder, decoder, row['beta'], cov=False)
+
+                if("lr" in self.param_df.columns):
+                    vae.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=row["lr"]))
+                else:
+                    vae.compile()
+                
+                cv_val_data = data.shard(self.kf.n_splits, i)
+                train_data = data.shard(self.kf.n_splits, (i+1) % self.kf.n_splits)
+
+                for j in range(2, self.kf.n_splits):
+                    train_data = train_data.concatenate(data.shard(self.kf.n_splits, (i+j) % self.kf.n_splits))
+
+                if "lr_scheduler" in self.param_df.columns:
+                    callbacks = [row["lr_scheduler"]]
+                else:
+                    callbacks = []
+
+                if "epochs" in self.param_df.columns:
+                    vae, hist = train_val_vae(vae, train_data, cv_val_data, verbose=verbose-1, epochs=row["epochs"], callbacks=callbacks)
+                else:
+                    vae, hist = train_val_vae(vae, train_data, cv_val_data, verbose=verbose-1, epochs=200, callbacks=callbacks)
+
+                # Top metrics from each fold
+                best_cv_total_loss.append(np.min(hist.history['val_total_loss']))
+                best_cv_recon_loss.append(np.min(hist.history['val_reconstruction_loss']))
+                best_cv_kl_loss.append(np.min(hist.history['val_kl_loss']))
+                best_cv_r2.append(np.max(hist.history['val_r2']))
+                
+                # History from each fold
+                cv_total_hist.append(hist.history['val_total_loss'])
+                cv_recon_hist.append(hist.history['val_reconstruction_loss'])
+                cv_kl_hist.append(hist.history['val_kl_loss'])
+                training_total_hist.append(hist.history['total_loss'])
+                training_recon_hist.append((hist.history['reconstruction_loss']))
+                training_kl_hist.append(hist.history['kl_loss'])
+
+                # Fixed validation set R2 performance from each fold
+                val_dict = vae.evaluate(val_data, verbose=verbose-1, return_dict=True)
+                validation_r2.append(val_dict['r2_feat'])
+            
+            # Average metrics from all folds
+            row["avg_best_cv_total_loss"] = np.mean(best_cv_total_loss)
+            row["avg_best_cv_recon_loss"] = np.mean(best_cv_recon_loss)
+            row["avg_best_cv_kl_loss"] = np.mean(best_cv_kl_loss)
+            row["avg_best_cv_r2"] = np.mean(best_cv_r2)
+            row["avg_cv_total_loss_history"] = np.mean(cv_total_hist, axis=0)
+            row["avg_cv_recon_loss_history"] = np.mean(cv_recon_hist, axis=0)
+            row["avg_cv_kl_loss_history"] = np.mean(cv_kl_hist, axis=0)
+            row["avg_training_total_loss_history"] = np.mean(training_total_hist, axis=0)
+            row["avg_training_recon_loss_history"] = np.mean(training_recon_hist, axis=0)
+            row["avg_training_kl_loss_history"] = np.mean(training_kl_hist, axis=0)
+            row["avg_validation_r2"] = np.mean(validation_r2)
+            
+            # Instantiate a new dataframe to store the results
+            if j == 0:
+                results = pd.DataFrame(columns=row.keys())
+
+            results.loc[len(results)] = row
+            # saves checkpoint for after each cross validation
             if self.save_path is not None:
-                filename = get_filename_from_df(row)
-                self.save_path = os.path.join(os.getcwd(), filename)
-        
+                with open(os.path.join(self.save_path, 'results.pkl'), 'wb') as f:
+                    pickle.dump(results, f)
+        return results
+
 
 class CyclicAnnealingBeta:
     """Scheduler that implements the cyclical annealing beta schedule as described in the paper.

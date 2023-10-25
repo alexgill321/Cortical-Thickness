@@ -15,7 +15,7 @@ import os
 from utils import generate_data_thickness_only, generate_feature_names
 from modelUtils.lr_utils import MultiOptimizerLearningRateScheduler, CyclicLR, ExponentialDecayScheduler
 from modelUtils.vae_utils import train_val_vae, create_vae, VAECrossValidator, save_vae, load_vae, \
-    get_filename_from_params, create_param_grid, load_or_train_model, create_param_df
+    get_filename_from_params, create_param_grid, load_or_train_model, create_param_df, VAECrossValidatorDF
 import vis_utils as vu
 import shutil
 from vaeModelAnalyzer import VAEModelAnalyzer
@@ -700,9 +700,9 @@ class TestVAEVisUtils(unittest.TestCase):
         self.assertTrue(ax.get_ylabel() == "Reconstruction")
         shutil.rmtree(save_path)
 
-class TestCrossValidation(unittest.TestCase):
+class TestCrossValidationDF(unittest.TestCase):
     def setUp(self) -> None:
-        return super().setUp()
+        self.datapath = os.path.join(os.getcwd(), 'data/cleaned_data/megasample_cleaned.csv')
     
     def test_create_param_df_default(self):
         param_df = create_param_df()
@@ -783,6 +783,137 @@ class TestCrossValidation(unittest.TestCase):
             self.assertIn(row['initializer'], ['glorot_uniform', 'glorot_normal'])
             self.assertIn(row['beta'], [0.01, 0.001])
             self.assertIn(row['conditioning'], [False, True])
+        
+    def test_create_cv_df(self):
+        params = create_param_df()
+        cv_df = VAECrossValidatorDF(params)
+        self.assertIsInstance(cv_df, VAECrossValidatorDF)
+
+    def test_cross_validate_simple(self):
+        params = create_param_df(epochs=[10])
+        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        results = cv_df.cross_validate(self.datapath)
+        self.assertEqual(len(results), 1)
+        keys = results.keys()
+        self.assertIn("conditioning", keys)
+        self.assertIn("h_dim", keys)
+        self.assertIn("z_dim", keys)
+        self.assertIn("dropout", keys)
+        self.assertIn("activation", keys)
+        self.assertIn("initializer", keys)
+        self.assertIn("beta", keys)
+        self.assertIn("epochs", keys)
+        self.assertIn("avg_best_cv_total_loss", keys)
+        self.assertIn("avg_best_cv_recon_loss", keys)
+        self.assertIn("avg_best_cv_kl_loss", keys)
+        self.assertIn("avg_best_cv_r2", keys)
+        self.assertIn("avg_cv_total_loss_history", keys)
+        self.assertIn("avg_cv_recon_loss_history", keys)
+        self.assertIn("avg_cv_kl_loss_history", keys)
+        self.assertIn("avg_training_total_loss_history", keys)
+        self.assertIn("avg_training_recon_loss_history", keys)
+        self.assertIn("avg_training_kl_loss_history", keys)
+        self.assertIn("avg_validation_r2", keys)
+        res_row = results.iloc[0]
+        self.assertEqual(res_row["conditioning"], True)
+        self.assertEqual(res_row["h_dim"], [512, 256])
+        self.assertEqual(res_row["z_dim"], 10)
+        self.assertEqual(res_row["dropout"], 0.2)
+        self.assertEqual(res_row["activation"], "relu")
+        self.assertEqual(res_row["initializer"], "glorot_normal")
+        self.assertEqual(res_row["beta"], 0.001)
+        self.assertEqual(res_row["epochs"], 10)
+        self.assertIsInstance(res_row["avg_best_cv_total_loss"], float)
+        self.assertIsInstance(res_row["avg_best_cv_recon_loss"], float)
+        self.assertIsInstance(res_row["avg_best_cv_kl_loss"], float)
+        self.assertIsInstance(res_row["avg_best_cv_r2"], float)
+        self.assertEquals(len(res_row["avg_cv_total_loss_history"]), 10)
+        self.assertEquals(len(res_row["avg_cv_recon_loss_history"]), 10)
+        self.assertEquals(len(res_row["avg_cv_kl_loss_history"]), 10)
+        self.assertEquals(len(res_row["avg_training_total_loss_history"]), 10)
+        self.assertEquals(len(res_row["avg_training_recon_loss_history"]), 10)
+        self.assertEquals(len(res_row["avg_training_kl_loss_history"]), 10)
+        self.assertIsInstance(res_row["avg_validation_r2"], float)
+
+    def test_cross_validate_multiple_h_dim(self):
+        params = create_param_df(h_dim=[[256, 128], [512, 256]], epochs=[10])
+        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        results = cv_df.cross_validate(self.datapath)
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results.iloc[0]["h_dim"], [256, 128])
+        self.assertEqual(results.iloc[1]["h_dim"], [512, 256])
+
+    def test_cross_validate_multiple_z_dim(self):
+        params = create_param_df(z_dim=[5, 10, 15], epochs=[10])
+        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        results = cv_df.cross_validate(self.datapath)
+        self.assertEqual(len(results), 3)
+        self.assertEqual(results.iloc[0]["z_dim"], 5)
+        self.assertEqual(results.iloc[1]["z_dim"], 10)
+        self.assertEqual(results.iloc[2]["z_dim"], 15)
+    
+    def test_cross_validate_multiple_dropout(self):
+        params = create_param_df(dropout=[0.1, 0.2, 0.3], epochs=[10])
+        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        results = cv_df.cross_validate(self.datapath)
+        self.assertEqual(len(results), 3)
+        self.assertEqual(results.iloc[0]["dropout"], 0.1)
+        self.assertEqual(results.iloc[1]["dropout"], 0.2)
+        self.assertEqual(results.iloc[2]["dropout"], 0.3)
+    
+    def test_cross_validate_multiple_activation(self):
+        params = create_param_df(activation=["selu", "relu"], epochs=[10])
+        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        results = cv_df.cross_validate(self.datapath)
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results.iloc[0]["activation"], "selu")
+        self.assertEqual(results.iloc[1]["activation"], "relu")
+    
+    def test_cross_validate_multiple_initializer(self):
+        params = create_param_df(initializer=["glorot_uniform", "glorot_normal"], epochs=[10])
+        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        results = cv_df.cross_validate(self.datapath)
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results.iloc[0]["initializer"], "glorot_uniform")
+        self.assertEqual(results.iloc[1]["initializer"], "glorot_normal")
+    
+    def test_cross_validate_multiple_beta(self):
+        params = create_param_df(beta=[0.01, 0.001, 0.0001], epochs=[10])
+        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        results = cv_df.cross_validate(self.datapath)
+        self.assertEqual(len(results), 3)
+        self.assertEqual(results.iloc[0]["beta"], 0.01)
+        self.assertEqual(results.iloc[1]["beta"], 0.001)
+        self.assertEqual(results.iloc[2]["beta"], 0.0001)
+
+    def test_cross_validate_multiple_conditioning(self):
+        params = create_param_df(conditioning=[False, True], epochs=[10])
+        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        results = cv_df.cross_validate(self.datapath)
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results.iloc[0]["conditioning"], False)
+        self.assertEqual(results.iloc[1]["conditioning"], True)
+    
+    def test_cross_validate_multiple_epochs(self):
+        params = create_param_df(epochs=[10, 20, 30])
+        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        results = cv_df.cross_validate(self.datapath)
+        self.assertEqual(len(results), 3)
+        self.assertEqual(results.iloc[0]["epochs"], 10)
+        self.assertEqual(results.iloc[1]["epochs"], 20)
+        self.assertEqual(results.iloc[2]["epochs"], 30)
+
+    def test_cross_validate_multiple_norms(self):
+        params = create_param_df(normalization = [0, 1, 2, 3], epochs=[10])
+        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        results = cv_df.cross_validate(self.datapath)
+        self.assertEqual(len(results), 4)
+        for i, row in results.iterrows():
+            self.assertIn(row["normalization"], [0, 1, 2, 3])
+
+
+
+
         
 
 def generate_simple_cv(save_path):
