@@ -11,8 +11,3 @@ outputs/
 unitTests/__pycache__/
 
 *.pyc
-__pycache__/utils.cpython-39.pyc
-__pycache__/vaeModelAnalyzer.cpython-39.pyc
-__pycache__/vis_utils.cpython-39.pyc
-models/__pycache__/vae_models.cpython-39.pyc
-modelUtils/__pycache__/vae_utils.cpython-39.pyc
