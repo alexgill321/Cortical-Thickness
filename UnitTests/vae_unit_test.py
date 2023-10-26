@@ -911,11 +911,6 @@ class TestCrossValidationDF(unittest.TestCase):
         for i, row in results.iterrows():
             self.assertIn(row["normalization"], [0, 1, 2, 3])
 
-
-
-
-        
-
 def generate_simple_cv(save_path):
     cur = os.getcwd()
     filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
