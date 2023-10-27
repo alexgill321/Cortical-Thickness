@@ -534,13 +534,18 @@ class VAECrossValidatorDF:
                 - lr_scheduler (tf.keras.callbacks.LearningRateScheduler): Learning rate scheduler to use for training. \n
         k_folds (int): Number of folds to use for cross validation.
         save_path (str): Path to save the models to.
+        test_mode (bool): If True, the cross validation is run in test mode. This means that data is stored when function wrappers are
+            called so the data can be inspected.
     """
-    def __init__(self, param_df: pd.DataFrame, k_folds: int = 5, save_path: str = None):
+    def __init__(self, param_df: pd.DataFrame, k_folds: int = 5, save_path: str = None, test_mode: bool = False):
         self.param_df = param_df
         self.save_path = save_path
         self.kf = KFold(n_splits=k_folds)
+        self.generate_data_params = [] # For testing purposes
+        self.train_val_vae_params = [] # For testing purposes
+        self.test_mode = test_mode # For testing purposes
     
-    def cross_validate(self, datapath: str, verbose: int = 1):
+    def cross_validate(self, datapath: str, verbose: int = 1) -> pd.DataFrame:
         """ Run a cross validation for k folds over the data provided in the given dataframe.
 
         Args:
@@ -552,20 +557,25 @@ class VAECrossValidatorDF:
         """
 
         data_sets = {}
+        self.generate_data_params.clear()
         if "normalization" in self.param_df.columns and "subset" in self.param_df.columns:
-            for norm, subset in set(zip(self.param_df["normalization"], self.param_df["subset"])):
-                train, val, test, labels = generate_data(datapath, norm, subset)
+            norms = [norm[0] for norm in self.param_df["normalization"].to_numpy()]
+            subsets = [subset[0] for subset in self.param_df["subset"].to_numpy()]
+            for norm, subset in set(zip(norms, subsets)):
+                train, val, test, labels = self.generate_data_wrapper(filepath=datapath, normalize=norm, subset=subset)
                 data_sets[(norm, subset)] = (train, val, test, labels)
         elif "normalization" in self.param_df.columns:
-            for norm in set(self.param_df["normalization"].items()):
-                train, val, test, labels = generate_data(datapath, norm)
+            norms = [norm[0] for norm in self.param_df["normalization"].to_numpy()]
+            for norm in set(norms):
+                train, val, test, labels = self.generate_data_wrapper(filepath=datapath, normalize=norm)
                 data_sets[norm] = (train, val, test, labels)
         elif "subset" in self.param_df.columns:
-            for subset in self.param_df["subset"].unique():
-                train, val, test, labels = generate_data(datapath, subset=subset)
-                data_sets[subset] = (train, val, test, labels)    
+            subsets = [subset[0] for subset in self.param_df["subset"].to_numpy()]
+            for subset in subsets:
+                    train, val, test, labels = self.generate_data_wrapper(filepath=datapath, subset=subset)
+                    data_sets[subset] = (train, val, test, labels)    
         else:
-            train, val, test, labels = generate_data(datapath)
+            train, val, test, labels = self.generate_data_wrapper(filepath=datapath)
             
 
         for j, row in tqdm(self.param_df.iterrows(), total=len(self.param_df), desc="Model Progress", ncols=80):
@@ -596,10 +606,6 @@ class VAECrossValidatorDF:
 
             for i in tqdm(range(self.kf.n_splits), desc="Fold Progress", ncols=80, disable = True if verbose < 1 else False):
                 vae = None
-                if self.save_path is not None:
-                    filename = get_filename_from_df(row)
-                    self.save_path = os.path.join(os.getcwd(), filename)
-                
                 input_dim = train.element_spec[0].shape[0]
                 cov_dim = train.element_spec[1].shape[0]
                 if(row["conditioning"]):
@@ -632,9 +638,9 @@ class VAECrossValidatorDF:
                     callbacks = []
 
                 if "epochs" in self.param_df.columns:
-                    vae, hist = train_val_vae(vae, train_data, cv_val_data, verbose=verbose-1, epochs=row["epochs"], callbacks=callbacks)
+                    vae, hist = self.train_val_vae_wrapper(vae=vae, train_data=train_data, val_data=cv_val_data, verbose=verbose-1, epochs=row["epochs"], callbacks=callbacks)
                 else:
-                    vae, hist = train_val_vae(vae, train_data, cv_val_data, verbose=verbose-1, epochs=200, callbacks=callbacks)
+                    vae, hist = self.train_val_vae_wrapper(vae=vae, train_data=train_data, val_data=cv_val_data, verbose=verbose-1, epochs=200, callbacks=callbacks)
 
                 # Top metrics from each fold
                 best_cv_total_loss.append(np.min(hist.history['val_total_loss']))
@@ -674,9 +680,37 @@ class VAECrossValidatorDF:
             results.loc[len(results)] = row
             # saves checkpoint for after each cross validation
             if self.save_path is not None:
+                if not os.path.exists(self.save_path):
+                    os.makedirs(self.save_path)
                 with open(os.path.join(self.save_path, 'results.pkl'), 'wb') as f:
                     pickle.dump(results, f)
         return results
+    
+    def generate_data_wrapper(self, **kwargs):
+        """ Wrapper for generate_data that stores the parameters when generate_data is called
+         This method is used for testing.
+          
+        Args:
+            **kwargs: Keyword arguments to pass to generate_data.
+             
+        Returns: The output of generate_data.
+        """
+        if self.test_mode:
+            self.generate_data_params.append(kwargs)
+        return generate_data(**kwargs)
+    
+    def train_val_vae_wrapper(self, **kwargs):
+        """ Wrapper for train_val_vae that stores the parameters when train_val_vae is called
+         This method is used for testing.
+          
+        Args:
+            **kwargs: Keyword arguments to pass to train_val_vae.
+             
+        Returns: The output of train_val_vae.
+        """
+        if self.test_mode:
+            self.train_val_vae_params.append(kwargs)
+        return train_val_vae(**kwargs)
 
 
 class CyclicAnnealingBeta:

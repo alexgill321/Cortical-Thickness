@@ -12,7 +12,7 @@ import numpy as np
 import tensorflow as tf
 from models.vae_models import VAE, calc_kl_loss, create_vae_encoder, create_vae_decoder, r2_feat_score, r2_score
 import os
-from utils import generate_data_thickness_only, generate_feature_names
+from utils import generate_data_thickness_only, generate_data
 from modelUtils.lr_utils import MultiOptimizerLearningRateScheduler, CyclicLR, ExponentialDecayScheduler
 from modelUtils.vae_utils import train_val_vae, create_vae, VAECrossValidator, save_vae, load_vae, \
     get_filename_from_params, create_param_grid, load_or_train_model, create_param_df, VAECrossValidatorDF
@@ -20,6 +20,8 @@ import vis_utils as vu
 import shutil
 from vaeModelAnalyzer import VAEModelAnalyzer
 import matplotlib.pyplot as plt
+from unittest.mock import patch
+import pandas as pd
 
 
 class TestVAEModel(unittest.TestCase):
@@ -700,6 +702,7 @@ class TestVAEVisUtils(unittest.TestCase):
         self.assertTrue(ax.get_ylabel() == "Reconstruction")
         shutil.rmtree(save_path)
 
+
 class TestCrossValidationDF(unittest.TestCase):
     def setUp(self) -> None:
         self.datapath = os.path.join(os.getcwd(), 'data/cleaned_data/megasample_cleaned.csv')
@@ -791,7 +794,7 @@ class TestCrossValidationDF(unittest.TestCase):
 
     def test_cross_validate_simple(self):
         params = create_param_df(epochs=[10])
-        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        cv_df = VAECrossValidatorDF(params, k_folds=2, test_mode=True)
         results = cv_df.cross_validate(self.datapath)
         self.assertEqual(len(results), 1)
         keys = results.keys()
@@ -837,7 +840,7 @@ class TestCrossValidationDF(unittest.TestCase):
 
     def test_cross_validate_multiple_h_dim(self):
         params = create_param_df(h_dim=[[256, 128], [512, 256]], epochs=[10])
-        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        cv_df = VAECrossValidatorDF(params, k_folds=2, test_mode=True)
         results = cv_df.cross_validate(self.datapath)
         self.assertEqual(len(results), 2)
         self.assertEqual(results.iloc[0]["h_dim"], [256, 128])
@@ -845,7 +848,7 @@ class TestCrossValidationDF(unittest.TestCase):
 
     def test_cross_validate_multiple_z_dim(self):
         params = create_param_df(z_dim=[5, 10, 15], epochs=[10])
-        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        cv_df = VAECrossValidatorDF(params, k_folds=2, test_mode=True)
         results = cv_df.cross_validate(self.datapath)
         self.assertEqual(len(results), 3)
         self.assertEqual(results.iloc[0]["z_dim"], 5)
@@ -854,7 +857,7 @@ class TestCrossValidationDF(unittest.TestCase):
     
     def test_cross_validate_multiple_dropout(self):
         params = create_param_df(dropout=[0.1, 0.2, 0.3], epochs=[10])
-        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        cv_df = VAECrossValidatorDF(params, k_folds=2, test_mode=True)
         results = cv_df.cross_validate(self.datapath)
         self.assertEqual(len(results), 3)
         self.assertEqual(results.iloc[0]["dropout"], 0.1)
@@ -863,7 +866,7 @@ class TestCrossValidationDF(unittest.TestCase):
     
     def test_cross_validate_multiple_activation(self):
         params = create_param_df(activation=["selu", "relu"], epochs=[10])
-        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        cv_df = VAECrossValidatorDF(params, k_folds=2, test_mode=True)
         results = cv_df.cross_validate(self.datapath)
         self.assertEqual(len(results), 2)
         self.assertEqual(results.iloc[0]["activation"], "selu")
@@ -871,7 +874,7 @@ class TestCrossValidationDF(unittest.TestCase):
     
     def test_cross_validate_multiple_initializer(self):
         params = create_param_df(initializer=["glorot_uniform", "glorot_normal"], epochs=[10])
-        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        cv_df = VAECrossValidatorDF(params, k_folds=2, test_mode=True)
         results = cv_df.cross_validate(self.datapath)
         self.assertEqual(len(results), 2)
         self.assertEqual(results.iloc[0]["initializer"], "glorot_uniform")
@@ -879,7 +882,7 @@ class TestCrossValidationDF(unittest.TestCase):
     
     def test_cross_validate_multiple_beta(self):
         params = create_param_df(beta=[0.01, 0.001, 0.0001], epochs=[10])
-        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        cv_df = VAECrossValidatorDF(params, k_folds=2, test_mode=True)
         results = cv_df.cross_validate(self.datapath)
         self.assertEqual(len(results), 3)
         self.assertEqual(results.iloc[0]["beta"], 0.01)
@@ -888,7 +891,7 @@ class TestCrossValidationDF(unittest.TestCase):
 
     def test_cross_validate_multiple_conditioning(self):
         params = create_param_df(conditioning=[False, True], epochs=[10])
-        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        cv_df = VAECrossValidatorDF(params, k_folds=2, test_mode=True)
         results = cv_df.cross_validate(self.datapath)
         self.assertEqual(len(results), 2)
         self.assertEqual(results.iloc[0]["conditioning"], False)
@@ -896,7 +899,7 @@ class TestCrossValidationDF(unittest.TestCase):
     
     def test_cross_validate_multiple_epochs(self):
         params = create_param_df(epochs=[10, 20, 30])
-        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        cv_df = VAECrossValidatorDF(params, k_folds=2, test_mode=True)
         results = cv_df.cross_validate(self.datapath)
         self.assertEqual(len(results), 3)
         self.assertEqual(results.iloc[0]["epochs"], 10)
@@ -904,12 +907,123 @@ class TestCrossValidationDF(unittest.TestCase):
         self.assertEqual(results.iloc[2]["epochs"], 30)
 
     def test_cross_validate_multiple_norms(self):
-        params = create_param_df(normalization = [0, 1, 2, 3], epochs=[10])
-        cv_df = VAECrossValidatorDF(params, k_folds=2)
+        params = create_param_df(normalization=[0, 1, 2, 3], epochs=[10])
+        cv_df = VAECrossValidatorDF(params, k_folds=2, test_mode=True)
         results = cv_df.cross_validate(self.datapath)
+
         self.assertEqual(len(results), 4)
         for i, row in results.iterrows():
             self.assertIn(row["normalization"], [0, 1, 2, 3])
+
+        # Assert that generate_data was called with specific normalize parameter
+        for call in cv_df.generate_data_params:
+            self.assertIn(call['normalize'], [0, 1, 2, 3])
+    
+    def test_cross_validate_multiple_subsets(self):
+        params = create_param_df(subset=["all", "thickness", "volume", "thickness_volume"], epochs=[10])
+        cv_df = VAECrossValidatorDF(params, k_folds=2, test_mode=True)
+        results = cv_df.cross_validate(self.datapath)
+
+        self.assertEqual(len(results), 4)
+        for i, row in results.iterrows():
+            self.assertIn(row["subset"], ["all", "thickness", "volume", "thickness_volume"])
+        
+        # Assert that generate_data was called with specific subset parameter
+        for call in cv_df.generate_data_params:
+            self.assertIn(call['subset'], ["all", "thickness", "volume", "thickness_volume"])
+    
+    def test_cross_validate_multiple_norms_subsets(self):
+        params = create_param_df(normalization=[0, 1, 2, 3], subset=["all", "thickness", "volume", "thickness_volume"], epochs=[10])
+        cv_df = VAECrossValidatorDF(params, k_folds=2, test_mode=True)
+        results = cv_df.cross_validate(self.datapath)
+
+        self.assertEqual(len(results), 16)
+        for i, row in results.iterrows():
+            self.assertIn(row["normalization"], [0, 1, 2, 3])
+            self.assertIn(row["subset"], ["all", "thickness", "volume", "thickness_volume"])
+
+        # Assert that generate_data was called with specific subset and normalization parameters
+        calls = []
+        for call in cv_df.generate_data_params:
+            calls.append((call['normalize'], call['subset']))
+        self.assertEqual(len(calls), 16)
+        for norm in [0, 1, 2, 3]:
+            for subset in ["all", "thickness", "volume", "thickness_volume"]:
+                self.assertIn((norm, subset), calls)
+
+    def test_cross_validate_non_unique_norms_subsets(self):
+        params = create_param_df(normalization=[0, 1], subset=["all", "thickness"], epochs=[10], conditioning=[False, True])
+        cv_df = VAECrossValidatorDF(params, k_folds=2, test_mode=True)
+        results = cv_df.cross_validate(self.datapath)
+
+        self.assertEqual(len(results), 8)
+        for i, row in results.iterrows():
+            self.assertIn(row["normalization"], [0, 1])
+            self.assertIn(row["subset"], ["all", "thickness"])
+            self.assertIn(row["conditioning"], [False, True])
+        
+        # Assert that generate_data was called with specific subset and normalization parameters
+        calls = []
+        for call in cv_df.generate_data_params:
+            calls.append((call['normalize'], call['subset']))
+        self.assertEqual(len(calls), 4)
+        for norm in [0, 1]:
+            for subset in ["all", "thickness"]:
+                    self.assertIn((norm, subset), calls)
+
+    def test_cross_validate_multiple_batch_sizes(self):
+        params = create_param_df(batch_size=[32, 64], epochs=[10])
+        cv_df = VAECrossValidatorDF(params, k_folds=2, test_mode=True)
+        results = cv_df.cross_validate(self.datapath)
+
+        self.assertEqual(len(results), 2)
+        for i, row in results.iterrows():
+            self.assertIn(row["batch_size"], [32, 64])
+
+        for call in cv_df.train_val_vae_params:
+            data = call['train_data']
+            batch = data.take(1)
+            for x, y in batch:
+                self.assertIn(x.shape[0], [32, 64])
+            
+    def test_cross_validate_multiple_learning_rates(self):
+        params = create_param_df(lr=[0.01, 0.001], epochs=[10])
+        cv_df = VAECrossValidatorDF(params, k_folds=2, test_mode=True)
+        results = cv_df.cross_validate(self.datapath)
+
+        self.assertEqual(len(results), 2)
+        for i, row in results.iterrows():
+            self.assertIn(row["lr"], [0.01, 0.001])
+
+        for call in cv_df.train_val_vae_params:
+            model = call['vae']
+            lr = model.optimizer.lr.numpy()
+            self.assertTrue(np.isclose(lr, 0.01, atol=1e-7) or np.isclose(lr, 0.001, atol=1e-7))
+
+    def test_cross_validate_save(self):
+        params = create_param_df(epochs=[10])
+        save_path = os.path.join(os.getcwd(), 'outputs/models/test/')
+        cv_df = VAECrossValidatorDF(params, k_folds=2, test_mode=True, save_path=save_path)
+        results = cv_df.cross_validate(self.datapath)
+        self.assertTrue(os.path.exists(save_path))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'results.pkl')))
+        load_res = pd.read_pickle(os.path.join(save_path, 'results.pkl'))
+        for i, row in results.iterrows():
+            self.assertTrue(row.equals(load_res.iloc[i]))
+        shutil.rmtree(save_path)
+
+    def test_cross_validate_save_mult(self):
+        params = create_param_df(epochs=[10], h_dim=[[256, 128], [512, 256]], normalization=[0, 1])
+        save_path = os.path.join(os.getcwd(), 'outputs/models/test/')
+        cv_df = VAECrossValidatorDF(params, k_folds=2, test_mode=True, save_path=save_path)
+        results = cv_df.cross_validate(self.datapath)
+        self.assertTrue(os.path.exists(save_path))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'results.pkl')))
+        load_res = pd.read_pickle(os.path.join(save_path, 'results.pkl'))
+        for i, row in results.iterrows():
+            self.assertTrue(row.equals(load_res.iloc[i]))
+        shutil.rmtree(save_path)
+
 
 def generate_simple_cv(save_path):
     cur = os.getcwd()

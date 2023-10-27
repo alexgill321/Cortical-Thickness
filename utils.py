@@ -55,8 +55,8 @@ def generate_data(filepath: str, split: float = 0.2, normalize: int = 1, subset:
     y_data = np.concatenate((one_hot_age, one_hot_sex), axis=1).astype('float32')
 
     if normalize == 0:
-        train_x_norm = train_x.values
-        test_x_norm = test_x.values
+        train_x_norm = train_x.to_numpy().astype('float64')
+        test_x_norm = test_x.to_numpy().astype('float64')
     elif normalize == 1:
         scaler = StandardScaler()
         train_x_norm = scaler.fit_transform(train_x)
@@ -75,7 +75,7 @@ def generate_data(filepath: str, split: float = 0.2, normalize: int = 1, subset:
     train_y = y_data[condition_indices, :]
     test_y = y_data[~db.index.isin(condition_indices), :]
 
-    train_x, val_x, train_y, val_y = train_test_split(train_x_norm, train_y, test_size=split, random_state=42)
+    train_x, val_x, train_y, val_y = train_test_split(train_x_norm, train_y, test_size=split, shuffle=False, random_state=42)
     val = tf.data.Dataset.from_tensor_slices((val_x, val_y))
     train = tf.data.Dataset.from_tensor_slices((train_x, train_y))
     test = tf.data.Dataset.from_tensor_slices((test_x_norm, test_y))
