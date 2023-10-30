@@ -36,14 +36,14 @@ def __main__():
         conditioning=[True, False],
         z_dim=[2, 3, 4, 5, 10, 15, 20, 25, 30],
         batch_size=[32, 64, 128, 256],
-        epochs=[500, 300, 200],
+        epochs=[300],
         learning_rate=[1e-4, 1e-3, 1e-5],
         dropout=[0.0, 0.1, 0.2, 0.3],
         activation=['relu', 'selu'],
         initializer=['glorot_uniform', 'glorot_normal', 'he_uniform', 'he_normal'],
         normalization=[0, 1, 2], subset=['thickness', 'volume', 'thickness_volume', 'all'],
         beta=[1e-4, 1e-3, 1e-5, 1e-6], h_dim=[[256, 128], [512, 256], [1024, 512], [128, 64], [256, 128, 64],
-                                              [512, 256, 128], [1024, 512, 256]],
+                                              [512, 256, 128]],
         samples=1000
         )
 
