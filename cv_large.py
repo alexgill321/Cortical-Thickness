@@ -17,9 +17,10 @@ This cross validation encompasses a wide range of hyperparameters, including:
 - data subset (thickness, volume, thickness_volume, all)
 """
 
-from modelUtils.vae_utils import create_param_df, VAECrossValidatorDF
 import argparse
 import os
+from modelUtils.vae_utils import create_param_df, VAECrossValidatorDF
+
 
 def __main__():
     parser = argparse.ArgumentParser(description='Run the large cross validation')
@@ -32,25 +33,30 @@ def __main__():
 
     # Create the parameter dataframe
     param_df = create_param_df(
-        conditioning = [True, False], 
-        z_dim = [2, 3, 4, 5, 10, 15, 20, 25, 30], 
-        batch_size = [32, 64, 128, 256], 
-        epochs = [500, 300, 200], 
-        learning_rate = [1e-4, 1e-3, 1e-5], 
-        dropout = [0.0, 0.1, 0.2, 0.3], 
-        activation = ['relu', 'selu'], 
-        initializer = ['glorot_uniform', 'glorot_normal', 'he_uniform', 'he_normal'], 
-        normalization = [0, 1, 2], subset = ['thickness', 'volume', 'thickness_volume', 'all'], 
-        beta = [1e-4, 1e-3, 1e-5, 1e-6], h_dim = [[256, 128], [512, 256], [1024, 512], [128, 64], [256, 128, 64], [512, 256, 128], [1024, 512, 256]], 
-        samples = 3000
+        conditioning=[True, False],
+        z_dim=[2, 3, 4, 5, 10, 15, 20, 25, 30],
+        batch_size=[32, 64, 128, 256],
+        epochs=[500, 300, 200],
+        learning_rate=[1e-4, 1e-3, 1e-5],
+        dropout=[0.0, 0.1, 0.2, 0.3],
+        activation=['relu', 'selu'],
+        initializer=['glorot_uniform', 'glorot_normal', 'he_uniform', 'he_normal'],
+        normalization=[0, 1, 2], subset = ['thickness', 'volume', 'thickness_volume', 'all'],
+        beta=[1e-4, 1e-3, 1e-5, 1e-6], h_dim = [[256, 128], [512, 256], [1024, 512], [128, 64], [256, 128, 64], [512, 256, 128], [1024, 512, 256]],
+        samples=3000
         )
 
     # Create the cross validator
-    cv = VAECrossValidatorDF(param_df, save_path = output_dir)
+    cv = VAECrossValidatorDF(param_df, save_path=output_dir)
     results = cv.cross_validate(datapath=file_path)
 
     if not os.path.exist(output_dir):
         os.mkdir(output_dir)
     results.to_csv(os.path.join(output_dir, 'cv_large_results.csv'))
+
+
+if __name__ == '__main__':
+    __main__()
+#%%
 
 

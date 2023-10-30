@@ -1,6 +1,6 @@
 seaborn~=0.12.2
 pandas~=2.0.3
-tensorflow-gpu
+tensorflow[and-cuda]
 numpy~=1.24.3
 scikit-learn~=1.3.0
 matplotlib~=3.7.2
