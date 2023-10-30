@@ -1,4 +1,4 @@
-ssh#!/bin/bash
+#!/bin/bash
 #SBATCH --account soc-gpu-np
 #SBATCH --partition soc-gpu-np
 #SBATCH --ntasks-per-node=32
