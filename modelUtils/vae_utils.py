@@ -507,7 +507,6 @@ def create_param_df(conditioning: list[bool] = None, h_dim: list[list[int]] = No
     if beta is None:
         beta = [0.001]
 
-
     kwargs_list = list(items for _, items in kwargs.items())
     param_combinations = itertools.product(conditioning, h_dim, z_dim, dropout, activation,
                                            initializer, beta, *kwargs_list)

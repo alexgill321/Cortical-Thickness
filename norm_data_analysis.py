@@ -1,7 +1,7 @@
 from modelUtils.vae_utils import train_val_vae, CyclicAnnealingBeta, CyclicalAnnealingBetaCallback
 from vaeModelAnalyzer import VAEModelAnalyzer
 from models.vae_models import create_vae_decoder, create_vae_encoder, VAE
-from utils import generate_data_thickness_only
+from utils import generate_data
 from modelUtils.lr_utils import MultiOptimizerLearningRateScheduler, CyclicLR, ExponentialDecayScheduler
 import os
 import tensorflow as tf
@@ -14,7 +14,7 @@ import numpy as np
 cur = os.getcwd()
 #%%
 filepath = os.path.join(cur, 'data/cleaned_data/megasample_cleaned.csv')
-train_data, val_data, test_data, feat_labels = generate_data_thickness_only(filepath, normalize=1)
+train_data, val_data, test_data, feat_labels = generate_data(filepath, normalize=1)
 num_features = train_data.element_spec[0].shape[0]
 cov_dim = train_data.element_spec[1].shape[0]
 train_data = train_data.batch(64)

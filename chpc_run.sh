@@ -11,7 +11,7 @@
 #SBATCH -o cv_large-%j
 
 source ~/miniconda3/etc/profile.d/conda.sh
-conda activate ct
+conda activate ct-tf
 
 OUT_DIR=/uufs/chpc.utah.edu/common/home/u1380656/Normative-Modeling-Using-Deep-Generative-Models/results
 FILE_PATH=/uufs/chpc.utah.edu/common/home/u1380656/Normative-Modeling-Using-Deep-Generative-Models/data/cleaned_data/megasample_cleaned.csv
