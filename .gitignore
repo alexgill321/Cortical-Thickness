@@ -9,3 +9,6 @@ outputs/
 .ipynb_checkpoints
 
 *.pyc
+/.vscode
+/notebooks
+
