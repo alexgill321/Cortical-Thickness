@@ -515,7 +515,7 @@ def create_param_df(conditioning: list[bool] = None, h_dim: list[list[int]] = No
     arg_names.remove('samples')
     for key, _ in kwargs.items():
         arg_names.append(key)
-    param_df = pd.DataFrame(param_combinations, columns=[arg_names])
+    param_df = pd.DataFrame(param_combinations, columns=arg_names)
 
     if samples is not None:
         param_df = param_df.sample(samples)
@@ -564,26 +564,31 @@ class VAECrossValidatorDF:
         data_sets = {}
         self.generate_data_params.clear()
         if "normalization" in self.param_df.columns and "subset" in self.param_df.columns:
-            norms = [norm[0] for norm in self.param_df["normalization"].to_numpy()]
-            subsets = [subset[0] for subset in self.param_df["subset"].to_numpy()]
+            norms = [norm for norm in self.param_df["normalization"].to_numpy()]
+            subsets = [subset for subset in self.param_df["subset"].to_numpy()]
             for norm, subset in set(zip(norms, subsets)):
                 train, val, test, labels = self.generate_data_wrapper(filepath=datapath, normalize=norm, subset=subset)
                 data_sets[(norm, subset)] = (train, val, test, labels)
         elif "normalization" in self.param_df.columns:
-            norms = [norm[0] for norm in self.param_df["normalization"].to_numpy()]
+            norms = [norm for norm in self.param_df["normalization"].to_numpy()]
             for norm in set(norms):
                 train, val, test, labels = self.generate_data_wrapper(filepath=datapath, normalize=norm)
                 data_sets[norm] = (train, val, test, labels)
         elif "subset" in self.param_df.columns:
-            subsets = [subset[0] for subset in self.param_df["subset"].to_numpy()]
+            subsets = [subset for subset in self.param_df["subset"].to_numpy()]
             for subset in subsets:
                     train, val, test, labels = self.generate_data_wrapper(filepath=datapath, subset=subset)
                     data_sets[subset] = (train, val, test, labels)    
         else:
             train, val, test, labels = self.generate_data_wrapper(filepath=datapath)
             
+        other_columns = ["avg_best_cv_total_loss", "avg_best_cv_recon_loss", "avg_best_cv_kl_loss", "avg_best_cv_r2", "avg_cv_total_loss_history",
+                         "avg_cv_recon_loss_history", "avg_cv_kl_loss_history", "avg_training_total_loss_history", "avg_training_recon_loss_history",
+                         "avg_training_kl_loss_history", "avg_val_feature_r2"]
+        param_df_columns = list(self.param_df.keys())
+        results = pd.DataFrame(columns=list(self.param_df.keys()) + other_columns)
 
-        for row_count, row in tqdm(self.param_df.iterrows(), total=len(self.param_df), desc="Model Progress", ncols=80):
+        for j, row in tqdm(self.param_df.iterrows(), total=len(self.param_df), desc="Model Progress", ncols=80):
             best_cv_total_loss = []
             best_cv_recon_loss = []
             best_cv_kl_loss = []
@@ -678,12 +683,9 @@ class VAECrossValidatorDF:
             row["avg_training_recon_loss_history"] = np.mean(training_recon_hist, axis=0)
             row["avg_training_kl_loss_history"] = np.mean(training_kl_hist, axis=0)
             row["avg_val_feature_r2"] = np.mean(validation_feat_r2, axis=0)
-            
-            # Instantiate a new dataframe to store the results
-            if row_count == 0:
-                results = pd.DataFrame(columns=row.keys())
 
             results.loc[len(results)] = row
+
             # saves checkpoint for after each cross validation
             if self.save_path is not None:
                 if not os.path.exists(self.save_path):
