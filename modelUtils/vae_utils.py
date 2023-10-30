@@ -583,7 +583,7 @@ class VAECrossValidatorDF:
             train, val, test, labels = self.generate_data_wrapper(filepath=datapath)
             
 
-        for j, row in tqdm(self.param_df.iterrows(), total=len(self.param_df), desc="Model Progress", ncols=80):
+        for row_count, row in tqdm(self.param_df.iterrows(), total=len(self.param_df), desc="Model Progress", ncols=80):
             best_cv_total_loss = []
             best_cv_recon_loss = []
             best_cv_kl_loss = []
@@ -680,7 +680,7 @@ class VAECrossValidatorDF:
             row["avg_val_feature_r2"] = np.mean(validation_feat_r2, axis=0)
             
             # Instantiate a new dataframe to store the results
-            if j == 0:
+            if row_count == 0:
                 results = pd.DataFrame(columns=row.keys())
 
             results.loc[len(results)] = row

@@ -41,13 +41,14 @@ def __main__():
         dropout=[0.0, 0.1, 0.2, 0.3],
         activation=['relu', 'selu'],
         initializer=['glorot_uniform', 'glorot_normal', 'he_uniform', 'he_normal'],
-        normalization=[0, 1, 2], subset = ['thickness', 'volume', 'thickness_volume', 'all'],
-        beta=[1e-4, 1e-3, 1e-5, 1e-6], h_dim = [[256, 128], [512, 256], [1024, 512], [128, 64], [256, 128, 64], [512, 256, 128], [1024, 512, 256]],
-        samples=3000
+        normalization=[0, 1, 2], subset=['thickness', 'volume', 'thickness_volume', 'all'],
+        beta=[1e-4, 1e-3, 1e-5, 1e-6], h_dim=[[256, 128], [512, 256], [1024, 512], [128, 64], [256, 128, 64],
+                                              [512, 256, 128], [1024, 512, 256]],
+        samples=1000
         )
 
     # Create the cross validator
-    cv = VAECrossValidatorDF(param_df, save_path=output_dir)
+    cv = VAECrossValidatorDF(param_df, save_path=output_dir, k_folds=3)
     results = cv.cross_validate(datapath=file_path)
 
     if not os.path.exist(output_dir):
