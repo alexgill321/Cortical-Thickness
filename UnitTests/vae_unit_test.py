@@ -12,7 +12,7 @@ import numpy as np
 import tensorflow as tf
 from models.vae_models import VAE, calc_kl_loss, create_vae_encoder, create_vae_decoder, r2_feat_score, r2_score
 import os
-from utils import generate_data_thickness_only, generate_data
+from utils import generate_data
 from modelUtils.lr_utils import MultiOptimizerLearningRateScheduler, CyclicLR, ExponentialDecayScheduler
 from modelUtils.vae_utils import train_val_vae, create_vae, VAECrossValidator, save_vae, load_vae, \
     get_filename_from_params, create_param_grid, load_or_train_model, create_param_df, VAECrossValidatorDF
@@ -27,8 +27,8 @@ import pandas as pd
 class TestVAEModel(unittest.TestCase):
     def setUp(self):
         cur = os.getcwd()
-        filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-        self.train_data, self.val_data, self.test_data, _ = generate_data_thickness_only(filepath)
+        filepath = os.path.join(cur, 'data/cleaned_data/megasample_cleaned.csv')
+        train_data, val_data, test_data, self.feat_labels = generate_data(filepath, subset='thickness')
         self.h_dim = [100, 100]
         self.z_dim = 20
         self.input_dim = self.train_data.element_spec[0].shape[0]
@@ -37,7 +37,7 @@ class TestVAEModel(unittest.TestCase):
         self.lr = 0.001
         self.encoder = create_vae_encoder(self.input_dim, self.h_dim, self.z_dim)
         self.decoder = create_vae_decoder(self.z_dim, self.h_dim, self.input_dim)
-        self.vae = VAE(self.encoder, self.decoder)
+        self.vae = VAE(self.encoder, self.decoder, cov=False)
 
     def test_encoder_output_shape(self):
         x = tf.random.normal(shape=(self.batch_size, self.input_dim))
@@ -198,9 +198,8 @@ class TestVAEModel(unittest.TestCase):
 class TestVAELearningRateScheduler(unittest.TestCase):
     def setUp(self):
         cur = os.getcwd()
-        filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-        self.train_data, self.val_data, self.test_data = generate_data_thickness_only(filepath)
-        self.input_dim = self.train_data.element_spec[0].shape[0]
+        filepath = os.path.join(cur, 'data/cleaned_data/megasample_cleaned.csv')
+        train_data, val_data, test_data, self.feat_labels = generate_data(filepath, subset='thickness')
         self.batch_size = 128
         self.epochs = 10
         self.encoder = create_vae_encoder(self.input_dim, [100, 100], 20)
@@ -247,14 +246,14 @@ class TestVAELearningRateScheduler(unittest.TestCase):
 class TestVAEUtils(unittest.TestCase):
     def setUp(self):
         cur = os.getcwd()
-        filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-        self.train_data, self.val_data, self.test_data, _ = generate_data_thickness_only(filepath)
+        filepath = os.path.join(cur, 'data/cleaned_data/megasample_cleaned.csv')
+        self.train_data, self.val_data, test_data, self.feat_labels = generate_data(filepath, subset='thickness')
         self.input_dim = self.train_data.element_spec[0].shape[0]
         self.batch_size = 128
         self.epochs = 10
         self.encoder = create_vae_encoder(self.input_dim, [100, 100], 20)
         self.decoder = create_vae_decoder(20, [100, 100], self.input_dim)
-        self.vae = VAE(self.encoder, self.decoder)
+        self.vae = VAE(self.encoder, self.decoder, cov=False)
         self.base_lr = 0.001
         self.max_lr = 0.006
         self.step_size = 20
@@ -463,7 +462,7 @@ class TestVAEUtils(unittest.TestCase):
         # TODO: Finish this test
         param_grid = create_param_grid([[100, 100]], [20], [0.2], ['relu'], ['glorot_uniform'], betas=[.01])
         self.vae.compile()
-        save_path = os.path.join(os.getcwd(), '../outputs/models/vae/')
+        save_path = os.path.join(os.getcwd(), 'outputs/models/vae/')
         cv = VAECrossValidator(param_grid, self.input_dim, k_folds=5, save_path=save_path)
         results = cv.cross_validate_df_val(self.train_data, epochs=10, val_data=self.val_data)
 
@@ -473,8 +472,8 @@ class TestVAEUtils(unittest.TestCase):
 class TestVAEAnalyzer(unittest.TestCase):
     def setUp(self):
         cur = os.getcwd()
-        filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-        train_data, val_data, test_data, cov, self.feat_labels = generate_data_thickness_only(filepath)
+        filepath = os.path.join(cur, 'data/cleaned_data/megasample_cleaned.csv')
+        train_data, val_data, test_data, self.feat_labels = generate_data(filepath, subset='thickness')
         h_dim = [100, 100]
         self.z_dim = 20
         input_dim = train_data.element_spec[0].shape[0]
@@ -483,7 +482,7 @@ class TestVAEAnalyzer(unittest.TestCase):
         lr = 0.001
         encoder = create_vae_encoder(input_dim, h_dim, self.z_dim)
         decoder = create_vae_decoder(self.z_dim, h_dim, input_dim)
-        vae = VAE(encoder, decoder)
+        vae = VAE(encoder, decoder, cov=False)
         vae.compile()
         val_batch_size = val_data.cardinality().numpy()
         val_data_batched = val_data.batch(val_batch_size)
@@ -501,7 +500,7 @@ class TestVAEAnalyzer(unittest.TestCase):
 
     def test_full_stack(self):
         analyzer = VAEModelAnalyzer(self.model, self.data, self.z_dim, self.feat_labels)
-        save_path = os.path.join(os.getcwd(), '../outputs/models/vae/test')
+        save_path = os.path.join(os.getcwd(), 'outputs/models/vae/test')
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         analyzer.full_stack(save_path)
@@ -518,7 +517,7 @@ class TestVAEAnalyzer(unittest.TestCase):
 
     def test_full_stack_hist(self):
         analyzer = VAEModelAnalyzer(self.model, self.data, self.z_dim, self.feat_labels, hist=self.hist)
-        save_path = os.path.join(os.getcwd(), '../outputs/models/vae/test')
+        save_path = os.path.join(os.getcwd(), 'outputs/models/vae/test')
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         analyzer.full_stack(save_path)
@@ -535,10 +534,12 @@ class TestVAEAnalyzer(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(save_path, 'kl_loss_hist.png')))
 
     def test_full_stack_cv(self):
-        save_path = os.path.join(os.getcwd(), '../outputs/models/vae/test')
-        results = generate_simple_cv(save_path)
+        save_path = os.path.join(os.getcwd(), 'outputs/models/vae/test')
+        param_df = create_param_df()
+        cv = VAECrossValidatorDF(param_df, k_folds=2,save_path=save_path)
+        results = cv.cross_validate(self.train_data)
         res = results.loc[0]
-        model = load_or_train_model(save_path, res['Parameters'], self.train_data, 10)
+        model = load_or_train_model(save_path, res, self.train_data, 10)
         analyzer = VAEModelAnalyzer(model, self.data, 15, self.feat_labels, cv_results=res)
         analyzer.full_stack(save_path)
         self.assertTrue(os.path.exists(save_path))
@@ -558,8 +559,8 @@ class TestVAEAnalyzer(unittest.TestCase):
 class TestVAEVisUtils(unittest.TestCase):
     def setUp(self):
         cur = os.getcwd()
-        filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-        train_data, val_data, test_data, cov, self.feat_labels = generate_data_thickness_only(filepath, normalize=True)
+        filepath = os.path.join(cur, 'data/cleaned_data/megasample_cleaned.csv')
+        train_data, val_data, test_data, self.feat_labels = generate_data(filepath, subset='thickness')
         input_dim = train_data.element_spec[0].shape[0]
         h_dim = [100, 100]
         val_batch_size = val_data.cardinality().numpy()
@@ -568,7 +569,7 @@ class TestVAEVisUtils(unittest.TestCase):
         self.z_dim = 15
         encoder = create_vae_encoder(input_dim, h_dim, self.z_dim)
         decoder = create_vae_decoder(self.z_dim, h_dim, input_dim)
-        vae = VAE(encoder, decoder)
+        vae = VAE(encoder, decoder, cov=False)
         vae.compile()
         vae.fit(train_data.batch(128), epochs=10, verbose=0)
         self.model = vae
@@ -786,7 +787,31 @@ class TestCrossValidationDF(unittest.TestCase):
             self.assertIn(row['initializer'], ['glorot_uniform', 'glorot_normal'])
             self.assertIn(row['beta'], [0.01, 0.001])
             self.assertIn(row['conditioning'], [False, True])
-        
+
+    def test_create_param_df_sampling(self):
+        param_df = create_param_df(normalizations = [0, 1], 
+                        subsets = ["all", "thickness"], 
+                        h_dim=[[256, 128], [512, 256]],
+                        z_dim=[5, 10],
+                        dropout=[0.1, 0.2],
+                        activation=['sigmoid', 'relu'],
+                        initializer=['glorot_uniform', 'glorot_normal'],
+                        beta=[0.01, 0.001], 
+                        conditioning=[False, True],
+                        samples=300
+                        )
+        self.assertEqual(len(param_df), 300)
+        for i, row in param_df.iterrows():
+            self.assertIn(row['normalizations'], [0, 1])
+            self.assertIn(row['subsets'], ["all", "thickness"])
+            self.assertIn(row['h_dim'], [[256, 128], [512, 256]])
+            self.assertIn(row['z_dim'], [5, 10])
+            self.assertIn(row['dropout'], [0.1, 0.2])
+            self.assertIn(row['activation'], ['sigmoid', 'relu'])
+            self.assertIn(row['initializer'], ['glorot_uniform', 'glorot_normal'])
+            self.assertIn(row['beta'], [0.01, 0.001])
+            self.assertIn(row['conditioning'], [False, True])
+
     def test_create_cv_df(self):
         params = create_param_df()
         cv_df = VAECrossValidatorDF(params)
@@ -816,7 +841,7 @@ class TestCrossValidationDF(unittest.TestCase):
         self.assertIn("avg_training_total_loss_history", keys)
         self.assertIn("avg_training_recon_loss_history", keys)
         self.assertIn("avg_training_kl_loss_history", keys)
-        self.assertIn("avg_validation_r2", keys)
+        self.assertIn("avg_val_feature_r2", keys)
         res_row = results.iloc[0]
         self.assertEqual(res_row["conditioning"], True)
         self.assertEqual(res_row["h_dim"], [512, 256])
@@ -829,14 +854,14 @@ class TestCrossValidationDF(unittest.TestCase):
         self.assertIsInstance(res_row["avg_best_cv_total_loss"], float)
         self.assertIsInstance(res_row["avg_best_cv_recon_loss"], float)
         self.assertIsInstance(res_row["avg_best_cv_kl_loss"], float)
-        self.assertIsInstance(res_row["avg_best_cv_r2"], float)
+        self.assertEquals(len(res_row["avg_best_cv_r2"]), 436)
         self.assertEquals(len(res_row["avg_cv_total_loss_history"]), 10)
         self.assertEquals(len(res_row["avg_cv_recon_loss_history"]), 10)
         self.assertEquals(len(res_row["avg_cv_kl_loss_history"]), 10)
         self.assertEquals(len(res_row["avg_training_total_loss_history"]), 10)
         self.assertEquals(len(res_row["avg_training_recon_loss_history"]), 10)
         self.assertEquals(len(res_row["avg_training_kl_loss_history"]), 10)
-        self.assertIsInstance(res_row["avg_validation_r2"], float)
+        self.assertEquals(len(res_row["avg_val_feature_r2"]), 436)
 
     def test_cross_validate_multiple_h_dim(self):
         params = create_param_df(h_dim=[[256, 128], [512, 256]], epochs=[10])
@@ -1024,19 +1049,32 @@ class TestCrossValidationDF(unittest.TestCase):
             self.assertTrue(row.equals(load_res.iloc[i]))
         shutil.rmtree(save_path)
 
+    def test_cross_validate_full(self):
+        params = create_param_df(cov=[True, False], epochs=[50], normalization=[1,2], subset=["thickness", "thickness_volume"])
+        save_path = os.path.join(os.getcwd(), 'outputs/models/test/')
+        cv_df = VAECrossValidatorDF(params, test_mode=True, save_path=save_path)
+        results = cv_df.cross_validate(self.datapath)
+        self.assertTrue(os.path.exists(save_path))
+        self.assertTrue(os.path.exists(os.path.join(save_path, 'results.pkl')))
+        load_res = pd.read_pickle(os.path.join(save_path, 'results.pkl'))
+        for i, row in results.iterrows():
+            self.assertTrue(row.equals(load_res.iloc[i]))
+        shutil.rmtree(save_path)
 
-def generate_simple_cv(save_path):
-    cur = os.getcwd()
-    filepath = os.path.join(cur, '../data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
-    train_data, val_data, test_data, cov, feat_labels = generate_data_thickness_only(filepath)
-    input_dim = train_data.element_spec[0].shape[0]
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-    param_grid = create_param_grid([[100, 100]], [15], [0.2], ['relu'], ['glorot_uniform'], betas=[.001])
-    cv = VAECrossValidator(param_grid, input_dim, k_folds=5, save_path=save_path)
-    results = cv.cross_validate_df_val(train_data, epochs=10, val_data=val_data)
-    return results
-
+        self.assertEqual(len(results), 8)
+        for i, row in results.iterrows():
+            self.assertIn(row["normalization"], [1, 2])
+            self.assertIn(row["subset"], ["thickness", "thickness_volume"])
+            self.assertIn(row["cov"], [True, False])
+            self.assertEqual(row["epochs"], 50)
+            self.assertEqual(row["h_dim"], [512, 256])
+            self.assertEquals(len(row["avg_cv_total_loss_history"]), 50)
+            self.assertEquals(len(row["avg_cv_recon_loss_history"]), 50)
+            self.assertEquals(len(row["avg_cv_kl_loss_history"]), 50)
+            self.assertEquals(len(row["avg_training_total_loss_history"]), 50)
+            self.assertEquals(len(row["avg_training_recon_loss_history"]), 50)
+            self.assertEquals(len(row["avg_training_kl_loss_history"]), 50)
+            self.assertIn(len(row["avg_val_feature_r2"]), [62, 124])
 
 if __name__ == '__main__':
     unittest.main()

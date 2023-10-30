@@ -34,10 +34,10 @@ class TestGenerateData(unittest.TestCase):
         self.assertTrue(test_feat == self.train_raw.shape[1])
         self.assertTrue(len(labels) == self.train_raw.shape[1])
 
-        self.assertTrue(train_card + val_card + test_card == self.train_raw.shape[0])
-        self.assertTrue(train_card == 0.8 * self.raw_data.shape[0])
-        self.assertTrue(val_card == 0.2 * self.raw_data.shape[0])
-        self.assertTrue(test_card == self.raw_data.shape[0])
+        self.assertTrue(train_card + val_card + test_card == self.raw_data.shape[0])
+        self.assertTrue(train_card == 0.8 * self.train_raw.shape[0])
+        self.assertTrue(val_card == 0.2 * self.train_raw.shape[0])
+        self.assertTrue(test_card == self.test_raw.shape[0])
 
     def test_all_features(self):
         # Test if the generated data contains all features when 'subset' is set to 'all'.

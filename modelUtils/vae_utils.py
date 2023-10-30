@@ -477,7 +477,7 @@ def create_param_grid(h_dims, z_dims, dropouts, activations, initializers, betas
 
 def create_param_df(conditioning: list[bool] = None, h_dim: list[list[int]] = None, z_dim: list[int] = None,
                     dropout: list[float] = None, activation: list[str] = None, initializer: list[str] = None,
-                    beta: list[float] = None, **kwargs: Any) -> pd.DataFrame:
+                    beta: list[float] = None, samples: int = None, **kwargs: Any) -> pd.DataFrame:
     """ Creates a parameter grid as a dataframe from the given parameters.
 
     Args:
@@ -488,6 +488,7 @@ def create_param_df(conditioning: list[bool] = None, h_dim: list[list[int]] = No
         activation (list[str]): List of activation functions to use.
         initializer (list[str]): List of initializers to use.
         beta (list[float]): List of beta values to use.
+        samples (int): Number of samples from the parameter grid to use. If None, all combinations are used.
 
     Returns: Parameter grid as a dataframe.
     """
@@ -512,9 +513,14 @@ def create_param_df(conditioning: list[bool] = None, h_dim: list[list[int]] = No
                                            initializer, beta, *kwargs_list)
     arg_names = list(inspect.signature(create_param_df).parameters.keys())
     arg_names.remove('kwargs')
+    arg_names.remove('samples')
     for key, _ in kwargs.items():
         arg_names.append(key)
     param_df = pd.DataFrame(param_combinations, columns=[arg_names])
+
+    if samples is not None:
+        param_df = param_df.sample(samples)
+
     return param_df
 
 
@@ -589,7 +595,7 @@ class VAECrossValidatorDF:
             training_total_hist = []
             training_recon_hist = []
             training_kl_hist = []
-            validation_r2 = []
+            validation_feat_r2 = []
 
             if "normalization" in self.param_df.columns and "subset" in self.param_df.columns:
                 train, val, test, labels = data_sets[(row["normalization"], row["subset"])]
@@ -629,8 +635,8 @@ class VAECrossValidatorDF:
                 cv_val_data = data.shard(self.kf.n_splits, i)
                 train_data = data.shard(self.kf.n_splits, (i+1) % self.kf.n_splits)
 
-                for j in range(2, self.kf.n_splits):
-                    train_data = train_data.concatenate(data.shard(self.kf.n_splits, (i+j) % self.kf.n_splits))
+                for k in range(2, self.kf.n_splits):
+                    train_data = train_data.concatenate(data.shard(self.kf.n_splits, (i+k) % self.kf.n_splits))
 
                 if "lr_scheduler" in self.param_df.columns:
                     callbacks = [row["lr_scheduler"]]
@@ -646,7 +652,8 @@ class VAECrossValidatorDF:
                 best_cv_total_loss.append(np.min(hist.history['val_total_loss']))
                 best_cv_recon_loss.append(np.min(hist.history['val_reconstruction_loss']))
                 best_cv_kl_loss.append(np.min(hist.history['val_kl_loss']))
-                best_cv_r2.append(np.max(hist.history['val_r2']))
+                mean_r2 = np.mean(hist.history['val_r2_feat'], axis=1)
+                best_cv_r2.append(hist.history['val_r2_feat'][np.argmax(mean_r2)])
                 
                 # History from each fold
                 cv_total_hist.append(hist.history['val_total_loss'])
@@ -658,20 +665,20 @@ class VAECrossValidatorDF:
 
                 # Fixed validation set R2 performance from each fold
                 val_dict = vae.evaluate(val_data, verbose=verbose-1, return_dict=True)
-                validation_r2.append(val_dict['r2_feat'])
+                validation_feat_r2.append(val_dict['r2_feat'])
             
             # Average metrics from all folds
             row["avg_best_cv_total_loss"] = np.mean(best_cv_total_loss)
             row["avg_best_cv_recon_loss"] = np.mean(best_cv_recon_loss)
             row["avg_best_cv_kl_loss"] = np.mean(best_cv_kl_loss)
-            row["avg_best_cv_r2"] = np.mean(best_cv_r2)
+            row["avg_best_cv_r2"] = np.mean(best_cv_r2, axis=0)
             row["avg_cv_total_loss_history"] = np.mean(cv_total_hist, axis=0)
             row["avg_cv_recon_loss_history"] = np.mean(cv_recon_hist, axis=0)
             row["avg_cv_kl_loss_history"] = np.mean(cv_kl_hist, axis=0)
             row["avg_training_total_loss_history"] = np.mean(training_total_hist, axis=0)
             row["avg_training_recon_loss_history"] = np.mean(training_recon_hist, axis=0)
             row["avg_training_kl_loss_history"] = np.mean(training_kl_hist, axis=0)
-            row["avg_validation_r2"] = np.mean(validation_r2)
+            row["avg_val_feature_r2"] = np.mean(validation_feat_r2, axis=0)
             
             # Instantiate a new dataframe to store the results
             if j == 0:
