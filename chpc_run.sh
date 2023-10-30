@@ -13,4 +13,9 @@
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate ct
 
-OUT_DIR=/
+OUT_DIR=/uufs/chpc.utah.edu/common/home/u1380656/Normative-Modeling-Using-Deep-Generative-Models/results
+FILE_PATH=/uufs/chpc.utah.edu/common/home/u1380656/Normative-Modeling-Using-Deep-Generative-Models/data/cleaned_data/megasample_cleaned.csv
+
+mkdir -p ${OUT_DIR}
+
+python cv_large.py --output_dir ${OUT_DIR} --file_path ${FILE_PATH}
