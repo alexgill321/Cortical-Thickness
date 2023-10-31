@@ -3,9 +3,9 @@
 #SBATCH --partition soc-gpu-np
 #SBATCH --ntasks-per-node=8
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:2080ti:3
+#SBATCH --gres=gpu:a100:3
 #SBATCH --time=8:00:00
-#SBATCH --mem=2GB
+#SBATCH --mem=16GB
 #SBATCH --mail-user=u1380656@umail.utah.edu
 #SBATCH --mail-type=FAIL,END
 #SBATCH -o cv_large-%j
