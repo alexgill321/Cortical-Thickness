@@ -20,6 +20,7 @@ This cross validation encompasses a wide range of hyperparameters, including:
 import argparse
 import os
 from modelUtils.vae_utils import create_param_df, VAECrossValidatorDF
+import tensorflow as tf
 
 
 def __main__():
@@ -27,6 +28,8 @@ def __main__():
     parser.add_argument('--output_dir', type=str, help='Directory where model results will be saved')
     parser.add_argument('--file_path', type=str, help='Path to the data file')
     args = parser.parse_args()
+
+    print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
     file_path = args.file_path
     output_dir = args.output_dir

@@ -20,7 +20,7 @@ import numpy as np
 import tensorflow as tf
 from models.aae_models import AAE, AAEDiscriminator, AAEDecoder, AAEEncoder, discriminator_loss, AAEOptimizer
 import os
-from utils import data_validation
+from utils import generate_data
 from modelUtils.lr_utils import MultiOptimizerLearningRateScheduler, CyclicLR, ExponentialDecayScheduler
 from keras import backend as k
 
@@ -40,7 +40,7 @@ class TestAAEModel(unittest.TestCase):
 
         cur = os.getcwd()
         filepath = os.path.join(cur, '../outputs/megasample_cleaned.csv')
-        self.train_data, self.val_data, self.test_data = data_validation(filepath)
+        self.train_data, self.val_data, self.test_data = generate_data(filepath)
 
         self.input_dim = self.train_data.element_spec[0].shape[0]
 

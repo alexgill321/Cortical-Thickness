@@ -14,7 +14,7 @@ import numpy as np
 cur = os.getcwd()
 #%%
 filepath = os.path.join(cur, 'data/cleaned_data/megasample_cleaned.csv')
-train_data, val_data, test_data, feat_labels = generate_data(filepath, normalize=1)
+train_data, val_data, test_data, feat_labels = generate_data(filepath, normalize=0, subset='thickness')
 num_features = train_data.element_spec[0].shape[0]
 cov_dim = train_data.element_spec[1].shape[0]
 train_data = train_data.batch(64)
@@ -42,7 +42,7 @@ for beta in betas:
     plt.close()
 """
 #%%
-beta = 1e-5
+beta = 1e-6
 h_dim = [512, 256]
 z_dim = [5]
 base_lr = 1e-3

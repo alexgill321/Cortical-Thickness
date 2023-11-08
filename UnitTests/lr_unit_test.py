@@ -12,7 +12,7 @@
 import unittest
 from models.aae_models import AAEOptimizer
 import os
-from utils import data_validation
+from utils import generate_data
 from modelUtils.lr_utils import MultiOptimizerLearningRateScheduler, CyclicLR, ExponentialDecayScheduler
 
 
@@ -26,7 +26,7 @@ class TestSchedulerModels(unittest.TestCase):
     def setUp(self):
         cur = os.getcwd()
         filepath = os.path.join(cur, '../outputs/megasample_cleaned.csv')
-        self.train_data, self.val_data, self.test_data = data_validation(filepath)
+        self.train_data, self.val_data, self.test_data = generate_data(filepath)
 
     def test_decay_to_expected_value_and_stay(self):
         initial_lr = 0.1

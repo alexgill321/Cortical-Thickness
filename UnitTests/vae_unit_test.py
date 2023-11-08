@@ -28,7 +28,7 @@ class TestVAEModel(unittest.TestCase):
     def setUp(self):
         cur = os.getcwd()
         filepath = os.path.join(cur, 'data/cleaned_data/megasample_cleaned.csv')
-        train_data, val_data, test_data, self.feat_labels = generate_data(filepath, subset='thickness')
+        self.train_data, val_data, test_data, self.feat_labels = generate_data(filepath, subset='thickness')
         self.h_dim = [100, 100]
         self.z_dim = 20
         self.input_dim = self.train_data.element_spec[0].shape[0]
@@ -54,21 +54,21 @@ class TestVAEModel(unittest.TestCase):
         x = tf.random.normal(shape=(self.batch_size, self.input_dim))
         z_mean, z_log_var = self.encoder(x)
         layers = self.encoder.layers
-        self.assertEqual(len(layers), len(self.h_dim) * 2 + 3)
+        self.assertEqual(len(layers), len(self.h_dim) * 4 + 3)
         self.assertEqual(self.encoder.layers[0].input_shape[0], (None, self.input_dim))
         self.assertEqual(self.encoder.layers[-1].output_shape, (None, self.z_dim))
         for i in range(len(self.h_dim)):
-            self.assertEqual(self.encoder.layers[i * 2 + 1].output_shape, (None, self.h_dim[i]))
+            self.assertEqual(self.encoder.layers[i * 4 + 1].output_shape, (None, self.h_dim[i]))
 
     def test_decoder_layer_shapes_simple(self):
         z = tf.random.normal(shape=(self.batch_size, self.z_dim))
         x = self.decoder(z)
         layers = self.decoder.layers
-        self.assertEqual(len(layers), len(self.h_dim) * 2 + 2)
+        self.assertEqual(len(layers), len(self.h_dim) * 4 + 2)
         self.assertEqual(self.decoder.layers[0].input_shape[0], (None, self.z_dim))
         self.assertEqual(self.decoder.layers[-1].output_shape, (None, self.input_dim))
         for i in range(len(self.h_dim)):
-            self.assertEqual(self.decoder.layers[i * 2 + 1].output_shape, (None, self.h_dim[i]))
+            self.assertEqual(self.decoder.layers[i * 4 + 1].output_shape, (None, self.h_dim[i]))
 
     def test_encoder_layer_shapes_complex(self):
         self.h_dim = [300, 200, 100]
@@ -76,11 +76,11 @@ class TestVAEModel(unittest.TestCase):
         x = tf.random.normal(shape=(self.batch_size, self.input_dim))
         z_mean, z_log_var = self.encoder(x)
         layers = self.encoder.layers
-        self.assertEqual(len(layers), len(self.h_dim) * 2 + 3)
+        self.assertEqual(len(layers), len(self.h_dim) * 4 + 3)
         self.assertEqual(self.encoder.layers[0].input_shape[0], (None, self.input_dim))
         self.assertEqual(self.encoder.layers[-1].output_shape, (None, self.z_dim))
         for i in range(len(self.h_dim)):
-            self.assertEqual(self.encoder.layers[i * 2 + 1].output_shape, (None, self.h_dim[i]))
+            self.assertEqual(self.encoder.layers[i * 4 + 1].output_shape, (None, self.h_dim[i]))
 
     def test_decoder_layer_shapes_complex(self):
         self.h_dim = [300, 200, 100]
@@ -88,12 +88,12 @@ class TestVAEModel(unittest.TestCase):
         z = tf.random.normal(shape=(self.batch_size, self.z_dim))
         x = self.decoder(z)
         layers = self.decoder.layers
-        self.assertEqual(len(layers), len(self.h_dim) * 2 + 2)
+        self.assertEqual(len(layers), len(self.h_dim) * 4 + 2)
         self.assertEqual(self.decoder.layers[0].input_shape[0], (None, self.z_dim))
         self.assertEqual(self.decoder.layers[-1].output_shape, (None, self.input_dim))
         self.h_dim = self.h_dim[::-1]
         for i in range(len(self.h_dim)):
-            self.assertEqual(self.decoder.layers[i * 2 + 1].output_shape, (None, self.h_dim[i]))
+            self.assertEqual(self.decoder.layers[i * 4 + 1].output_shape, (None, self.h_dim[i]))
 
     def test_vae_output_shape(self):
         train_data = self.train_data.batch(self.batch_size)
