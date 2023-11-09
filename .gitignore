@@ -2,7 +2,6 @@
 .idea/
 
 # Project folders
-data/
 outputs/
 
 # Jupyter Notebook
