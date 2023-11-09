@@ -13,7 +13,7 @@ import numpy as np
 
 cur = os.getcwd()
 #%%
-filepath = os.path.join(cur, 'data/cleaned_data/megasample_ctvol_500sym_max2percIV_cleaned.csv')
+filepath = os.path.join(cur, 'data/cleaned_data/megasample_cleaned.csv')
 train_data, val_data, test_data, feat_labels = generate_data_thickness_only(filepath, normalize=2)
 num_features = train_data.element_spec[0].shape[0]
 train_data = train_data.batch(128)
@@ -41,8 +41,8 @@ for beta in betas:
     plt.close()
 """
 #%%
-beta = 1e-4
-h_dim = [300, 150]
+beta = 1e-5
+h_dim = [512, 256]
 z_dim = [20]
 base_lr = 1e-3
 max_lr = 1e-6
