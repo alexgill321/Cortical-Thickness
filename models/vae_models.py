@@ -62,7 +62,7 @@ def create_vae_decoder(latent_dim, hidden_dim, output_dim, activation='relu', in
         x = keras.layers.Dense(
             h_dim,
             kernel_initializer=initializer)(x)
-        x = keras.layers.BatchNormalization()(x)
+        # x = keras.layers.BatchNormalization()(x)
         x = keras.layers.Activation(activation)(x)
         x = keras.layers.Dropout(dropout_rate)(x)
 

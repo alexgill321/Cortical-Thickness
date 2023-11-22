@@ -14,10 +14,11 @@ import numpy as np
 cur = os.getcwd()
 #%%
 filepath = os.path.join(cur, 'data/cleaned_data/megasample_cleaned.csv')
-train_data, val_data, test_data, feat_labels = generate_data(filepath, normalize=0, subset='thickness')
+normalize = 1
+train_data, val_data, test_data, feat_labels = generate_data(filepath, normalize=normalize, subset='thickness')
 num_features = train_data.element_spec[0].shape[0]
 cov_dim = train_data.element_spec[1].shape[0]
-train_data = train_data.batch(64)
+train_data = train_data.batch(128)
 val_data = val_data.batch(val_data.cardinality().numpy())
 test_data = test_data.batch(test_data.cardinality().numpy())
 #%%
@@ -42,9 +43,9 @@ for beta in betas:
     plt.close()
 """
 #%%
-beta = 1e-6
+beta = 1e-5
 h_dim = [512, 256]
-z_dim = [5]
+z_dim = [3]
 base_lr = 1e-3
 max_lr = 1e-6
 step_size = 50
@@ -58,18 +59,18 @@ decay_rate = 0.88
 # opt_scheduler = [ExponentialDecayScheduler(max_lr, decay_rate, decay_steps)]
 
 for z in z_dim:
-    encoder = create_vae_encoder(input_dim=num_features+cov_dim, hidden_dim=h_dim, latent_dim=z, dropout_rate=0.2)
-    decoder = create_vae_decoder(latent_dim=z+cov_dim, hidden_dim=h_dim, output_dim=num_features, dropout_rate=0.2)
-    vae = VAE(encoder, decoder, beta=beta, cov=True)
+    encoder = create_vae_encoder(input_dim=num_features, hidden_dim=h_dim, latent_dim=z, dropout_rate=0.1)
+    decoder = create_vae_decoder(latent_dim=z, hidden_dim=h_dim, output_dim=num_features, dropout_rate=0.1)
+    vae = VAE(encoder, decoder, beta=beta, cov=False)
     vae.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4))
     optimizer = [vae.optimizer]
 
     # lr_and_opt = zip(opt_scheduler, optimizer)
     # scheduler = MultiOptimizerLearningRateScheduler(lr_and_opt)
     # scheduler = CyclicalAnnealingBetaCallback(beta_scheduler)
-    model, hist = train_val_vae(vae, train_data, val_data, epochs=400, verbose=1)
+    model, hist = train_val_vae(vae, train_data, val_data, epochs=300, verbose=1)
     analyzer = VAEModelAnalyzer(model, next(iter(val_data)), z, feat_labels, hist=hist, test_data=next(iter(test_data)))
-    save_path = os.path.join(cur, f'outputs/analysis/cov_sn_z_{z}')
+    save_path = os.path.join(cur, f'outputs/analysis/non_parcel_norm_{normalize}_no_cov_sn_z_{z}')
 
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -77,17 +78,17 @@ for z in z_dim:
     analyzer.full_stack(save_path)
 
     # without covariates
-    encoder = create_vae_encoder(input_dim=num_features, hidden_dim=h_dim, latent_dim=z, dropout_rate=0.2)
-    decoder = create_vae_decoder(latent_dim=z, hidden_dim=h_dim, output_dim=num_features, dropout_rate=0.2)
-    vae_no_cov = VAE(encoder, decoder, beta=beta, cov=False)
+    encoder = create_vae_encoder(input_dim=num_features+cov_dim, hidden_dim=h_dim, latent_dim=z, dropout_rate=0.2)
+    decoder = create_vae_decoder(latent_dim=z+cov_dim, hidden_dim=h_dim, output_dim=num_features, dropout_rate=0.2)
+    vae_no_cov = VAE(encoder, decoder, beta=beta, cov=True)
     vae_no_cov.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4))
 
     # lr_and_opt = zip(opt_scheduler, optimizer)
     # scheduler = MultiOptimizerLearningRateScheduler(lr_and_opt)
     # scheduler = CyclicalAnnealingBetaCallback(beta_scheduler)
-    model, hist = train_val_vae(vae_no_cov, train_data, val_data, epochs=400, verbose=1)
+    model, hist = train_val_vae(vae_no_cov, train_data, val_data, epochs=300, verbose=1)
     analyzer = VAEModelAnalyzer(model, next(iter(val_data)), z, feat_labels, hist=hist, test_data=next(iter(test_data)))
-    save_path = os.path.join(cur, f'outputs/analysis/no_cov_sn_z_{z}')
+    save_path = os.path.join(cur, f'outputs/analysis/non_parcel_norm_{normalize}_cov_sn_z_{z}')
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     analyzer.full_stack(save_path)

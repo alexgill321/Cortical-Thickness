@@ -657,7 +657,7 @@ class VAECrossValidatorDF:
                 best_cv_recon_loss.append(np.min(hist.history['val_reconstruction_loss']))
                 best_cv_kl_loss.append(np.min(hist.history['val_kl_loss']))
                 mean_r2 = np.mean(hist.history['val_r2_feat'], axis=1)
-                best_cv_r2.append(hist.history['val_r2_feat'][np.argmax(mean_r2)])
+                best_cv_r2.append(np.max(mean_r2, axis=0))
                 
                 # History from each fold
                 cv_total_hist.append(hist.history['val_total_loss'])
